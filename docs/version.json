@@ -1,13 +1,13 @@
 {
-  "version": "0.36",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.36/ClassManager.App.exe",
-  "size": 82806703,
-  "sha256": "ea13839a7231d970831ae365e5159ee090f8d4fe0e1a7bc0649d1eda857b5ff9",
-  "notes": "chore: 0.36（安装目录清理验证版）",
+  "version": "0.38",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.38/ClassManager.App.exe",
+  "size": 82808405,
+  "sha256": "78dd8d0e6942a62811fc34689ebb2acbcbf5e3fd58f81889372420caf7fb5ece",
+  "notes": "chore: 清理临时测试脚本",
   "publishedAt": "2026-10-31",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.36/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.36/ClassManager.App.exe"
+    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.38/ClassManager.App.exe",
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.38/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
