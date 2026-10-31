@@ -90,7 +90,15 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add 'docs/version.json'
-          if (-not (git diff --staged --quiet)) {
+
+          # 注意：必须用 $LASTEXITCODE 判断有无改动。
+          # PowerShell 里 `(git diff --quiet)` 捕获的是输出数组，exit code 会丢失，
+          # 写成 `if (-not (git diff --staged --quiet))` 会恒为真，
+          # 无改动时也会去 commit → 报「nothing to commit」→ 整个步骤失败。
+          git diff --staged --quiet
+          if ($LASTEXITCODE -ne 0) {
             git commit -m "chore: 更新更新清单 ${{ github.ref_name }}"
             git push
+          } else {
+            Write-Host '清单无变化，跳过提交'
           }
