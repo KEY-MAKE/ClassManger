@@ -13,6 +13,7 @@ appsettings.Development.json
 _attachments/
 _conversations/
 _tools/
+docs/*.exe
 
 # 临时调研脚本
 .tmp-*/
