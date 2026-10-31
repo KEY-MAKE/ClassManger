@@ -16,7 +16,10 @@ public static class AppVersion
 
     private static string Resolve()
     {
-        var assembly = Assembly.GetEntryAssembly() ?? typeof(AppVersion).Assembly;
+        // 用**本程序集自身**，而不是 Assembly.GetEntryAssembly()。
+        // 入口程序集在某些宿主下不是我们（比如被测试宿主加载时是 testhost.exe），
+        // 那会读到别人的版本号 —— 版本号一错，"检查更新"的比较结果就全错了。
+        var assembly = typeof(AppVersion).Assembly;
 
         var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (!string.IsNullOrWhiteSpace(informational))
