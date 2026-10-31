@@ -32,10 +32,10 @@ dotnet publish ClassManager.App/ClassManager.App.csproj -c Release -r win-x64 --
 
 ```
 # A. 清单当 Release 资产（地址永不变，永远指向最新 Release）
-https://github.com/KEY-MAKE/ClassManager/releases/latest/download/version.json
+https://github.com/KEY-MAKE/ClassManger/releases/latest/download/version.json
 
 # B. 清单放仓库 docs/，走 jsDelivr（国内快，实测 1.8 秒）
-https://cdn.jsdelivr.net/gh/KEY-MAKE/ClassManager@main/docs/version.json
+https://cdn.jsdelivr.net/gh/KEY-MAKE/ClassManger@main/docs/version.json
 ```
 
 国内下载慢的话，程序会自动回退到加速镜像（实测 14KB/s → 369–516KB/s），
