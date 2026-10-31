@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     一键发布：本地构建 → 打 tag → 推送 → GitHub Actions 自动出 Release。
 
