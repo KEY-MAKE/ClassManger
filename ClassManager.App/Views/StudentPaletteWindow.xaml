@@ -1,0 +1,73 @@
+<ui:FluentWindow x:Class="ClassManager.App.Views.StudentPaletteWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="学生名单"
+                 Width="330"
+                 Height="620"
+                 MinWidth="280"
+                 MinHeight="360"
+                 WindowStartupLocation="Manual"
+                 Topmost="False"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="学生名单" ShowMinimize="False" ShowMaximize="False" ShowClose="True" />
+
+        <ui:TextBox Grid.Row="1"
+                    x:Name="SearchBox"
+                    Margin="10,4,10,8"
+                    PlaceholderText="搜索姓名…"
+                    TextChanged="OnSearchTextChanged" />
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="10,0,10,0">
+            <ItemsControl x:Name="ChipList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="3" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="6,8"
+                                Margin="0,0,6,6"
+                                Cursor="Hand"
+                                ToolTip="拖到座位上安排"
+                                MouseLeftButtonDown="OnChipMouseLeftButtonDown"
+                                MouseMove="OnChipMouseMove">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}"
+                                           TextWrapping="Wrap"
+                                           TextAlignment="Center"
+                                           FontSize="12" />
+                                <TextBlock Text="{Binding Score, StringFormat={}{0:0.#}分}"
+                                           TextAlignment="Center"
+                                           FontSize="10"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <TextBlock Grid.Row="3"
+                   Text="把名字拖到座位上即可安排；右键座位可清空。"
+                   Style="{StaticResource CaptionTextStyle}"
+                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                   TextWrapping="Wrap"
+                   Margin="10,8,10,12" />
+    </Grid>
+</ui:FluentWindow>

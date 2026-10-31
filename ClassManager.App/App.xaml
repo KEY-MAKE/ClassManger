@@ -1,0 +1,26 @@
+<Application x:Class="ClassManager.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:conv="clr-namespace:ClassManager.App.Converters"
+             ShutdownMode="OnLastWindowClose">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- 顺序要求：先 ThemesDictionary 再 ControlsDictionary。
+                     默认浅色（应用启动后会按设置再 Apply 一次） -->
+                <ui:ThemesDictionary Theme="Light" />
+                <ui:ControlsDictionary />
+                <ResourceDictionary Source="Themes/Palette.xaml" />
+                <ResourceDictionary Source="Themes/Typography.xaml" />
+                <ResourceDictionary Source="Themes/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <conv:CountToVisibilityConverter x:Key="CountToVisibilityConverter" />
+            <conv:BoolToSeatedBrushConverter x:Key="BoolToSeatedBrushConverter" />
+            <conv:EnumToBooleanConverter x:Key="EnumToBooleanConverter" />
+            <conv:HostHeightConverter x:Key="HostHeightConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

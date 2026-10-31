@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        业务色刷资源键（仅保留仍被引用的键）。
+        静态默认值 = 亮色主题取值（见 docs/ARCHITECTURE.md §7.2 的 Light 列），
+        保证首次绘制即为正确亮色外观。
+        运行时由 ThemeService.ApplyPalette 在 Application.Resources 顶层用新刷覆盖同名键
+        （Palette.xaml 为扁平 BAML 资源字典，其 SolidColorBrush 加载后会被 WPF 冻结，
+         无法改 Color，故采用「覆盖」而非「改色」）。
+        键名：SeatSelectedBrush（座位页学生按钮选中态）/ SeatedChipBrush（已排座学生按钮底色）。
+        说明：座位画布已改为固定蓝白配色（见 SeatMapPalette.cs），不再依赖这些主题刷，
+              故已移除 Desk/Chair/Aisle/Platform/Blackboard/SeatEmpty/SeatOccupied/Called/Uncalled 等死键。
+    -->
+
+    <SolidColorBrush x:Key="SeatSelectedBrush" Color="#0078D4" />
+    <SolidColorBrush x:Key="SeatedChipBrush" Color="#C8E6C9" />
+
+</ResourceDictionary>

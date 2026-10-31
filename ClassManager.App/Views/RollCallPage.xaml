@@ -1,0 +1,211 @@
+<Page x:Class="ClassManager.App.Views.RollCallPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="点名系统">
+    <Page.InputBindings>
+        <KeyBinding Key="F5" Command="{Binding RollCommand}" />
+        <KeyBinding Modifiers="Control" Key="O" Command="{Binding ImportCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding ClearResultCommand}" />
+    </Page.InputBindings>
+
+    <Grid x:Name="Root" Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左控制栏 -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,16,0">
+            <StackPanel>
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="点名控制" Style="{StaticResource SubtitleTextStyle}" Margin="0,0,0,12" />
+
+                        <ui:Button Content="导入成绩单"
+                                   Icon="{ui:SymbolIcon FolderOpen24}"
+                                   Command="{Binding ImportCommand}"
+                                   Appearance="Primary"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,8" />
+
+                        <ui:Button Content="随机点名"
+                                   Icon="{ui:SymbolIcon ArrowSync24}"
+                                   Command="{Binding RollCommand}"
+                                   IsEnabled="{Binding HasData}"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,8" />
+
+                        <ui:Button Content="重置点名"
+                                   Icon="{ui:SymbolIcon ArrowReset24}"
+                                   Command="{Binding ResetRollCommand}"
+                                   IsEnabled="{Binding HasData}"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,8" />
+
+                        <ui:Button Content="点名统计"
+                                   Icon="{ui:SymbolIcon DataPie24}"
+                                   Command="{Binding ShowStatsCommand}"
+                                   IsEnabled="{Binding HasData}"
+                                   HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="点名模式" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <RadioButton GroupName="RollCallMode"
+                                     Content="随机点名"
+                                     IsChecked="{Binding Mode, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Random, Mode=TwoWay}"
+                                     Margin="0,0,0,6" />
+                        <RadioButton GroupName="RollCallMode"
+                                     Content="顺序点名"
+                                     IsChecked="{Binding Mode, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Sequential, Mode=TwoWay}"
+                                     Margin="0,0,0,6" />
+                        <RadioButton GroupName="RollCallMode"
+                                     Content="只点未到"
+                                     IsChecked="{Binding Mode, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=UncalledOnly, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding ModeHint}"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="点名统计" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                <TextBlock Text="{Binding Total}" Style="{StaticResource StatNumberTextStyle}"
+                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                <TextBlock Text="总人数" Style="{StaticResource CaptionTextStyle}"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                <TextBlock Text="{Binding Called}" Style="{StaticResource StatNumberTextStyle}"
+                                           Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                                <TextBlock Text="已点到" Style="{StaticResource CaptionTextStyle}"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                <TextBlock Text="{Binding Remaining}" Style="{StaticResource StatNumberTextStyle}"
+                                           Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                                <TextBlock Text="未点到" Style="{StaticResource CaptionTextStyle}"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 本次点名：显示本次点到的人，直到下次点名覆盖 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="本次点名" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <Grid Height="112">
+                            <!-- Viewbox：长姓名自动缩小，短姓名撑满，永不溢出 -->
+                            <Viewbox Stretch="Uniform"
+                                     StretchDirection="DownOnly"
+                                     HorizontalAlignment="Stretch"
+                                     VerticalAlignment="Center"
+                                     Margin="0,4"
+                                     Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{Binding ResultText}"
+                                           Style="{StaticResource ResultHeroTextStyle}"
+                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                           TextWrapping="NoWrap" />
+                            </Viewbox>
+
+                            <!-- 空态占位：字号小一档、次级色，与点名后形成层级差 -->
+                            <TextBlock Text="{Binding ResultText}"
+                                       Style="{StaticResource ResultPlaceholderTextStyle}"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 右主显示区 -->
+        <Grid Grid.Column="1">
+            <!-- 空状态 -->
+            <Border Style="{StaticResource StatCard}"
+                    Visibility="{Binding HasData, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460">
+                    <TextBlock Text="🎓" Style="{StaticResource EmptyStateIconStyle}" />
+                    <TextBlock Text="还没有导入班级数据" Style="{StaticResource EmptyStateTitleStyle}" />
+                    <TextBlock Text="导入一份包含姓名与成绩的 Excel(.xlsx) 或 CSV 文件，即可开始点名。"
+                               Style="{StaticResource EmptyStateSubtitleStyle}" />
+                    <ui:Button Content="导入成绩单"
+                               Icon="{ui:SymbolIcon FolderOpen24}"
+                               Command="{Binding ImportCommand}"
+                               Appearance="Primary"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- 有数据：右侧仅保留「学生名单」一张内嵌定高列表卡片（底部结果卡已移除） -->
+            <Grid Visibility="{Binding HasData, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border Style="{StaticResource StatCard}" Padding="0" VerticalAlignment="Top">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="14,12">
+                            <TextBlock Text="学生名单" Style="{StaticResource SectionHeaderTextStyle}"
+                                       VerticalAlignment="Center" Margin="0" />
+                            <ui:TextBox Grid.Column="0"
+                                        x:Name="SearchBox"
+                                        PlaceholderText="搜索姓名..."
+                                        Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                        Icon="{ui:SymbolIcon Search24}"
+                                        HorizontalAlignment="Right"
+                                        Width="220" />
+                        </Grid>
+
+                        <DataGrid Grid.Row="1"
+                                  ItemsSource="{Binding FilteredStudents}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  BorderThickness="0"
+                                  Background="Transparent"
+                                  HorizontalAlignment="Stretch"
+                                  RowHeight="34"
+                                  MaxHeight="460"
+                                  VerticalAlignment="Top"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="序号" Binding="{Binding Index}" Width="70" MinWidth="56" />
+                                <!-- 姓名列是唯一弹性列：MinWidth 保证它在任何宿主测量场景下都不会被压扁到不可读 -->
+                                <DataGridTextColumn Header="姓名" Binding="{Binding Name}" Width="*" MinWidth="180" />
+                                <DataGridTextColumn Header="成绩" Binding="{Binding ScoreText}" Width="100" MinWidth="80" />
+                                <DataGridTextColumn Header="状态" Binding="{Binding StatusText}" Width="140" MinWidth="110" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

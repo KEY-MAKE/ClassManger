@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <ApplicationIcon>Assets\Class.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.30</Version>
+    <AssemblyVersion>0.30.0.0</AssemblyVersion>
+    <FileVersion>0.30.0.0</FileVersion>
+    <AssemblyTitle>班级综合管理系统</AssemblyTitle>
+    <Product>班级综合管理系统</Product>
+    <Company>K.</Company>
+    <Authors>K.</Authors>
+    <Description>集成了点名系统、座位管理、讲评课件与AI办公的班级综合管理工具</Description>
+    <RootNamespace>ClassManager.App</RootNamespace>
+    <AssemblyName>ClassManager.App</AssemblyName>
+    <NeutralLanguage>zh-Hans</NeutralLanguage>
+    <!-- 中文单机工具：仅保留 zh-Hans / en 卫星资源，裁掉 ru/ja/de 等 13 个无用语言目录（约 15MB） -->
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+    <Configurations>Debug;Release</Configurations>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Class.ico" />
+    <Resource Include="Assets\Class.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 评讲课件引擎（Python 版 exam2ppt 及裁剪后的嵌入式运行时）以 zip 内嵌，
+         运行期解压到 %LocalAppData%\ClassManager\engine\，这样单文件 exe 分发不被破坏。 -->
+    <EmbeddedResource Include="Assets\engine\exam2ppt-payload.zip" />
+    <!-- AI 办公的内置凭据（OpenAI 兼容端点 + 模型 + 多把 key），运行期从程序集读取。 -->
+    <EmbeddedResource Include="Assets\ai\credentials.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="MiniExcel" Version="1.46.0" />
+  </ItemGroup>
+
+</Project>

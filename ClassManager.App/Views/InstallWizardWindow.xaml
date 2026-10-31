@@ -1,0 +1,106 @@
+<ui:FluentWindow x:Class="ClassManager.App.Views.InstallWizardWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="班级综合管理系统 - 安装向导"
+                 Width="620"
+                 Height="520"
+                 ResizeMode="NoResize"
+                 WindowStartupLocation="CenterScreen"
+                 WindowBackdropType="None">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 标题 -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,18">
+            <Image Source="pack://application:,,,/Assets/Class.png" Width="56" Height="56" Margin="0,0,16,0" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="欢迎使用班级综合管理系统" Style="{StaticResource TitleTextStyle}" />
+                <TextBlock Text="请选择安装位置与快捷方式选项，然后点击「开始安装」。"
+                           Style="{StaticResource BodyTextStyle}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- 表单 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border Style="{StaticResource StatCard}"
+                        Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                    <StackPanel>
+                        <TextBlock Text="安装目录" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding InstallDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                        IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}" />
+                            <ui:Button Grid.Column="1"
+                                       Content="浏览..."
+                                       Command="{Binding BrowseCommand}"
+                                       Margin="8,0,0,0" />
+                        </Grid>
+
+                        <TextBlock Text="{Binding SourceDirectoryHint}"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+
+                        <CheckBox Content="创建桌面快捷方式"
+                                  IsChecked="{Binding CreateDesktopShortcut}"
+                                  Margin="0,16,0,0" />
+                        <CheckBox Content="创建开始菜单快捷方式"
+                                  IsChecked="{Binding CreateStartMenuShortcut}"
+                                  Margin="0,8,0,0" />
+                        <CheckBox Content="安装完成后立即启动"
+                                  IsChecked="{Binding LaunchAfterInstall}"
+                                  Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource StatCard}"
+                        Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel HorizontalAlignment="Center" Margin="0,20">
+                        <TextBlock Text="✅" Style="{StaticResource EmptyStateIconStyle}" />
+                        <TextBlock Text="安装完成" Style="{StaticResource EmptyStateTitleStyle}" />
+                        <TextBlock Text="程序已成功安装。点击「完成」结束向导。"
+                                   Style="{StaticResource EmptyStateSubtitleStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 底部进度 + 按钮 -->
+        <Grid Grid.Row="2" Margin="0,16,0,0">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:ProgressRing Width="20" Height="20"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
+                                 Margin="0,0,10,0" />
+                <TextBlock Text="{Binding ProgressText}"
+                           Style="{StaticResource CaptionTextStyle}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <ui:Button Content="开始安装"
+                           Command="{Binding InstallCommand}"
+                           Appearance="Primary"
+                           IsEnabled="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"
+                           Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"
+                           Margin="0,0,8,0" />
+                <ui:Button Content="完成"
+                           Command="{Binding FinishCommand}"
+                           Appearance="Primary"
+                           Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibilityConverter}}" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

@@ -1,0 +1,349 @@
+classDiagram
+    class Student {
+        +string Name
+        +double Score
+    }
+    class RollCallMode {
+        <<enumeration>>
+        Random
+        Sequential
+        UncalledOnly
+    }
+    class CallRecord {
+        +string StudentName
+        +DateTime Timestamp
+        +RollCallMode Mode
+    }
+    class RollCallState {
+        +int Total
+        +int Called
+        +int Remaining
+        +double CompletionPercent
+    }
+    class RollCallResult {
+        +Student Student
+        +DateTime Timestamp
+        +RollCallMode Mode
+        +bool AlreadyCalled
+    }
+    class SeatAlgorithm {
+        <<enumeration>>
+        Snake
+        Grouped
+        Random
+    }
+    class SeatPosition {
+        +int Row
+        +int Col
+    }
+    class SeatLayout {
+        +int Rows
+        +int Cols
+        +IReadOnlyDictionary Seats
+        +IReadOnlyList~double~ ColumnGaps
+        +IReadOnlyList~double~ RowGaps
+        +double GroupThreshold
+        +bool ShowHeaders
+        +int TotalSeats
+        +int OccupiedSeats
+        +int EmptySeats
+        +Resize(rows, cols)
+        +SetColumnGap(index, value)
+        +SetRowGap(index, value)
+        +SetAllColumnGaps(value)
+        +SetAllRowGaps(value)
+        +NormalizeGap(value) double
+        +Get(row, col) string
+        +Set(row, col, name)
+        +Clear(row, col)
+        +TryFindSeat(name, out seat) bool
+        +ClearAll()
+    }
+    class ImportResult {
+        +IReadOnlyList~Student~ Students
+        +string FilePath
+        +string ClassName
+        +string NameColumn
+        +string ScoreColumn
+        +bool UsedFallbackNameColumn
+        +bool GeneratedDemoScores
+        +string NameColumnNotice
+    }
+    class AppSettings {
+        +ThemePreference Theme
+        +bool GenerateDemoScores
+        +string LastImportDirectory
+        +string LastExportDirectory
+        +string InstallDirectory
+        +double WindowWidth
+        +double WindowHeight
+        +AuthorInfo Author
+    }
+    class ThemePreference {
+        <<enumeration>>
+        System
+        Light
+        Dark
+    }
+    class AuthorInfo {
+        +string Name
+        +string Version
+        +string ReleaseDate
+        +string Email
+        +string Website
+        +string Description
+    }
+    class InstallOptions {
+        +string InstallDirectory
+        +bool CreateDesktopShortcut
+        +bool CreateStartMenuShortcut
+        +bool LaunchAfterInstall
+    }
+
+    class IImportService {
+        <<interface>>
+        +Import(filePath, demo) ImportResult
+    }
+    class ImportService
+    class IRollCallService {
+        <<interface>>
+        +LoadRoster(students)
+        +Reset()
+        +Roll() RollCallResult
+    }
+    class RollCallService
+    class ISeatingService {
+        <<interface>>
+        +UpdateLayout(rows, cols)
+        +ArrangeAuto(algorithm)
+        +TryPlace(student, row, col, out move) bool
+        +MoveTo(student, row, col)
+        +ClearSeat(row, col)
+    }
+    class SeatingService
+    class IExportService {
+        <<interface>>
+        +ExportSeatXlsx(path, layout, className, at)
+        +BuildSeatSheet(layout, className, at, includeHeaders) (Visual,Size)
+        +ExportSeatImage(path, layout, className, at, includeHeaders, jpeg)
+    }
+    class ExportService
+    class ISettingsService {
+        <<interface>>
+        +Load()
+        +Save()
+    }
+    class SettingsService
+    class IThemeService {
+        <<interface>>
+        +Apply(preference)
+        +Attach(window)
+    }
+    class ThemeService
+    class IShortcutService {
+        <<interface>>
+        +CreateLink(...)
+    }
+    class ShortcutService
+    class IInstallService {
+        <<interface>>
+        +Install(options, progress)
+        +Uninstall(removeUserSettings)
+        +LaunchInstalledCopy(dir)
+    }
+    class InstallService
+    class ISingleInstanceService {
+        <<interface>>
+        +Acquire()
+        +SignalFirstInstance()
+        +StartListening()
+    }
+    class SingleInstanceService
+    class IWindowActivationService {
+        <<interface>>
+        +BringToFront(window)
+    }
+    class WindowActivationService
+
+    class MainWindowViewModel {
+        +string ClassName
+        +string StatusMessage
+        +ThemePreference ThemePreference
+        +ImportCommand
+        +ToggleThemeCommand
+        +ShowAboutCommand
+        +UninstallCommand
+        +SetStatus(msg)
+        +ShowToast(title, msg, appearance)
+    }
+    class RollCallViewModel {
+        +RollCallMode Mode
+        +ObservableCollection~StudentRow~ Students
+        +string SearchText
+        +int Total
+        +int Called
+        +int Remaining
+        +double CompletionPercent
+        +string ResultText
+        +ImportCommand
+        +RollCommand
+        +ResetRollCommand
+        +ShowStatsCommand
+        +ApplyImport(result)
+    }
+    class SeatViewModel {
+        +int Rows
+        +int Cols
+        +bool ShowHeaders
+        +ObservableCollection~StudentChip~ StudentChips
+        +string SelectedStudentName
+        +int LayoutVersion
+        +UpdateLayoutCommand
+        +GapSettingsCommand
+        +SnakeCommand
+        +GroupedCommand
+        +RandomCommand
+        +SaveXlsxCommand
+        +PrintCommand
+        +ExportImageCommand
+        +SeatClickedCommand(position)
+        +SelectStudentCommand(name)
+        +ClearSelectionCommand
+    }
+    class InstallWizardViewModel {
+        +string InstallDirectory
+        +bool CreateDesktopShortcut
+        +bool CreateStartMenuShortcut
+        +bool LaunchAfterInstall
+        +bool IsBusy
+        +BrowseCommand
+        +InstallCommand
+        +FinishCommand
+    }
+    class AboutViewModel {
+        +AuthorInfo Author
+        +EditAuthorCommand
+        +UninstallCommand
+    }
+
+    class MainWindow
+    class RollCallPage
+    class SeatPage
+    class InstallWizardWindow
+    class AboutWindow
+    class AuthorInfoWindow
+    class RollCallStatsWindow
+    class SeatPrintWindow
+    class SeatMapControl
+    class SeatMapGeometry {
+        <<static>>
+        +ColumnOffsets(layout, showHeaders) double[]
+        +RowOffsets(layout, showHeaders) double[]
+        +CanvasSize(layout, showHeaders) Size
+        +GroupBlocks(layout) (int,int)[]
+        +Platform(layout, showHeaders) Rect
+    }
+    class SeatMapPalette {
+        <<static>>
+        +CanvasBackground
+        +SeatBorder
+        +SeatEmptyFill
+        +SeatOccupiedFill
+        +SeatSelectedFill
+        +AccentBlue
+        +NameText
+        +LabelText
+        +ExportBackground
+        +ExportInk
+    }
+    class GapSettingsWindow
+    class SeatExportOptionsWindow {
+        +bool IncludeHeaders
+    }
+    class GapSettingItem {
+        +string Label
+        +double Value
+    }
+    class NavigationPageProvider {
+        +GetPage(type) object
+    }
+    class AppServices {
+        +IImportService Import
+        +IRollCallService RollCall
+        +ISeatingService Seating
+        +IExportService Export
+        +ISettingsService Settings
+        +IThemeService Theme
+        +IInstallService Install
+        +ISingleInstanceService SingleInstance
+    }
+
+    MainWindowViewModel --> ISettingsService
+    MainWindowViewModel --> IThemeService
+    MainWindowViewModel --> IInstallService
+    RollCallViewModel --> IImportService
+    RollCallViewModel --> IRollCallService
+    SeatViewModel --> ISeatingService
+    SeatViewModel --> IExportService
+    SeatViewModel --> IImportService
+    InstallWizardViewModel --> IInstallService
+    AboutViewModel --> ISettingsService
+    AboutViewModel --> IInstallService
+
+    ImportService ..|> IImportService
+    RollCallService ..|> IRollCallService
+    SeatingService ..|> ISeatingService
+    ExportService ..|> IExportService
+    SettingsService ..|> ISettingsService
+    ThemeService ..|> IThemeService
+    ShortcutService ..|> IShortcutService
+    InstallService ..|> IInstallService
+    SingleInstanceService ..|> ISingleInstanceService
+    WindowActivationService ..|> IWindowActivationService
+
+    ImportService --> ImportResult
+    ImportResult o-- Student
+    RollCallService --> Student
+    RollCallService --> CallRecord
+    RollCallService --> RollCallState
+    RollCallService --> RollCallResult
+    SeatingService --> SeatLayout
+    SeatingService --> SeatAlgorithm
+    SeatLayout o-- Student
+    ExportService --> SeatLayout
+    SettingsService --> AppSettings
+    AppSettings o-- AuthorInfo
+    AppSettings --> ThemePreference
+    InstallService --> InstallOptions
+    InstallService --> IShortcutService
+
+    AppServices --> ImportService
+    AppServices --> RollCallService
+    AppServices --> SeatingService
+    AppServices --> ExportService
+    AppServices --> SettingsService
+    AppServices --> ThemeService
+    AppServices --> InstallService
+    AppServices --> SingleInstanceService
+
+    MainWindow --> MainWindowViewModel
+    MainWindow --> NavigationPageProvider
+    NavigationPageProvider ..> RollCallPage
+    NavigationPageProvider ..> SeatPage
+    RollCallPage --> RollCallViewModel
+    SeatPage --> SeatViewModel
+    SeatPage --> SeatMapControl
+    InstallWizardWindow --> InstallWizardViewModel
+    AboutWindow --> AboutViewModel
+    AboutWindow ..> AuthorInfoWindow
+    RollCallViewModel ..> RollCallStatsWindow
+    SeatViewModel ..> SeatPrintWindow
+    SeatViewModel ..> GapSettingsWindow
+    SeatViewModel ..> SeatExportOptionsWindow
+    GapSettingsWindow --> GapSettingItem
+    GapSettingsWindow --> SeatLayout
+    SeatMapControl --> SeatMapGeometry
+    SeatMapControl --> SeatMapPalette
+    ExportService --> SeatMapGeometry
+    ExportService --> SeatMapPalette
+    SeatExportOptionsWindow --> SeatLayout

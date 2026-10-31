@@ -1,0 +1,24 @@
+{
+ "content": "I'll list the workspace contents for you.\n\n",
+ "reasoning": "",
+ "tool_calls": [
+  {
+   "id": "chatcmpl-tool-9808ea6e3a49e70e",
+   "name": "list_files",
+   "arguments": "{\"path\": \"\"}"
+  }
+ ],
+ "finish_reason": "tool_calls",
+ "usage": {
+  "prompt_tokens": 1632,
+  "total_tokens": 1677,
+  "completion_tokens": 45,
+  "prompt_tokens_details": {
+   "cached_tokens": 320,
+   "created_cache_tokens": 1280
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0
+  }
+ }
+}

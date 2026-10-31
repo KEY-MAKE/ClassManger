@@ -1,0 +1,24 @@
+<UserControl x:Class="ClassManager.App.Controls.SeatMapControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             PreviewMouseDown="OnPreviewMouseDown"
+             PreviewMouseMove="OnPreviewMouseMove"
+             PreviewMouseUp="OnPreviewMouseUp"
+             PreviewMouseWheel="OnPreviewMouseWheel"
+             Background="Transparent">
+    <!-- 画布采用固定「蓝白纸面」风（不随明暗主题）：白底 + 浅蓝边框 + 蓝色强调。
+         白底取自 SeatMapPalette.CanvasBackground（单一来源），在构造函数中赋值。 -->
+    <Border x:Name="Paper"
+            BorderBrush="#D0D7DE"
+            BorderThickness="1"
+            CornerRadius="8"
+            ClipToBounds="True">
+        <ScrollViewer x:Name="Scroll"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      PanningMode="Both">
+            <Canvas x:Name="Surface" Width="1200" Height="800" />
+        </ScrollViewer>
+    </Border>
+</UserControl>

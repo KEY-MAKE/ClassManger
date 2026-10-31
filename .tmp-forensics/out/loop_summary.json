@@ -1,0 +1,348 @@
+[
+ {
+  "run": 0,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 29971,
+   "completion_tokens": 403,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 121
+   }
+  }
+ },
+ {
+  "run": 1,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 29839,
+   "completion_tokens": 271,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 48
+   }
+  }
+ },
+ {
+  "run": 2,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 29851,
+   "completion_tokens": 283,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "created_cache_tokens": 29568
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 48
+   }
+  }
+ },
+ {
+  "run": 3,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 30091,
+   "completion_tokens": 523,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 119
+   }
+  }
+ },
+ {
+  "run": 4,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 29865,
+   "completion_tokens": 297,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 96
+   }
+  }
+ },
+ {
+  "run": 5,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 30198,
+   "completion_tokens": 630,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 210
+   }
+  }
+ },
+ {
+  "run": 6,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 30169,
+   "completion_tokens": 601,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 374
+   }
+  }
+ },
+ {
+  "run": 7,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 30384,
+   "completion_tokens": 816,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 435
+   }
+  }
+ },
+ {
+  "run": 8,
+  "finish": "length",
+  "dsml": false,
+  "names": [],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 33664,
+   "completion_tokens": 4096,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 4096
+   }
+  }
+ },
+ {
+  "run": 9,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 32890,
+   "completion_tokens": 3322,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 3256
+   }
+  }
+ },
+ {
+  "run": 10,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 29965,
+   "completion_tokens": 397,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 193
+   }
+  }
+ },
+ {
+  "run": 11,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 30135,
+   "completion_tokens": 567,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 292
+   }
+  }
+ },
+ {
+  "run": 12,
+  "finish": "length",
+  "dsml": false,
+  "names": [],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 33664,
+   "completion_tokens": 4096,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 4095
+   }
+  }
+ },
+ {
+  "run": 13,
+  "finish": "length",
+  "dsml": false,
+  "names": [],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 33664,
+   "completion_tokens": 4096,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 4096
+   }
+  }
+ },
+ {
+  "run": 14,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "控制台输出出现了乱码（编码问题）。我先把结构转储到文件中，再用 `read_file` 读取。\n\n\n\n",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 30102,
+   "completion_tokens": 534,
+   "prompt_tokens_details": {
+    "cached_tokens": 1600,
+    "created_cache_tokens": 27968
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 107
+   }
+  }
+ },
+ {
+  "run": 15,
+  "finish": "tool_calls",
+  "dsml": false,
+  "names": [
+   "run_python"
+  ],
+  "weird": [],
+  "content_head": "",
+  "usage": {
+   "prompt_tokens": 29568,
+   "total_tokens": 33123,
+   "completion_tokens": 3555,
+   "prompt_tokens_details": {
+    "cached_tokens": 29504,
+    "created_cache_tokens": 64
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 3200
+   }
+  }
+ }
+]

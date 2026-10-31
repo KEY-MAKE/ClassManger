@@ -1,0 +1,15 @@
+data: {"id":"chatcmpl-fda25f6b-0429-41fe-a160-dd40ca1c7024","object":"chat.completion.chunk","created":1793413155,"model":"deepseek-v4.1-flash-1017","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-fda25f6b-0429-41fe-a160-dd40ca1c7024","object":"chat.completion.chunk","created":1793413155,"model":"deepseek-v4.1-flash-1017","choices":[{"index":0,"delta":{"tool_calls":[{"id":"chatcmpl-tool-8065780b96d2a336","type":"function","index":0,"function":{"name":"run_python"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-fda25f6b-0429-41fe-a160-dd40ca1c7024","object":"chat.completion.chunk","created":1793413155,"model":"deepseek-v4.1-flash-1017","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"code\": \""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-fda25f6b-0429-41fe-a160-dd40ca1c7024","object":"chat.completion.chunk","created":1793413155,"model":"deepseek-v4.1-flash-1017","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\nimport os, sys, zipfile, shutil\\nsys.stdout.reconfigure(encoding='utf-8')\\np = \\\"_conversations/20261031-091758_f9be\\\"\\nfiles = os.listdir(p)\\nmain = [f for f in files if f.endswith('.docx') and '纯答案' not in f][0]\\npath = os.path.join(p, main)\\nz = zipfile.ZipFile(path)\\nos.makedirs(\\\"_tmp_media\\\", exist_ok=True)\\nfor n in z.namelist():\\n    if 'media' in n:\\n        data = z.read(n)\\n        open(os.path.join(\\\"_tmp_media\\\", os.path.basename(n)), \\\"wb\\\").write(data)\\n# 找每张图对应的 rel 与位置\\nimport docx\\nd = docx.Document(path)\\nfor i, par in enumerate(d.paragraphs):\\n    x = par._p.xml\\n    if 'r:embed' in x:\\n        import re\\n        ids = re.findall(r'r:embed=\\\"(rId\\\\d+)\\\"', x)\\n        names = []\\n        for rid in ids:\\n            try: names.append(d.part.rels[rid].target_ref)\\n            except: names.append(\\\"?\\\")\\n        print(i, names, \\\"| text:\\\", par.text.strip()[:40])\\n"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-fda25f6b-0429-41fe-a160-dd40ca1c7024","object":"chat.completion.chunk","created":1793413155,"model":"deepseek-v4.1-flash-1017","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-fda25f6b-0429-41fe-a160-dd40ca1c7024","object":"chat.completion.chunk","created":1793413155,"model":"deepseek-v4.1-flash-1017","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: {"id":"chatcmpl-fda25f6b-0429-41fe-a160-dd40ca1c7024","object":"chat.completion.chunk","created":1793413155,"model":"deepseek-v4.1-flash-1017","choices":[],"usage":{"prompt_tokens":35924,"total_tokens":36244,"completion_tokens":320,"prompt_tokens_details":{"cached_tokens":35904,"created_cache_tokens":0},"completion_tokens_details":{"reasoning_tokens":0}}}
+
+data: [DONE]
