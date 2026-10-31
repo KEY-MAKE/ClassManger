@@ -126,7 +126,7 @@ public sealed class InstallService : IInstallService
 
         progress?.Report("正在复制程序文件...");
         AppendLog($"安装开始：{source} → {target}（{AppVersion.Display}）");
-        CopyDirectory(source, target);
+        CopyProgramFiles(source, target, progress);
 
         var exePath = Path.Combine(target, ExeName);
 
@@ -262,7 +262,7 @@ public sealed class InstallService : IInstallService
             Directory.CreateDirectory(tempDir);
 
             // 兼容两种发布形态：单文件版（仅 1 个 exe）与文件夹版（数百个文件）
-            CopyDirectory(source, tempDir);
+            CopyProgramFiles(source, tempDir);
 
             var exe = Path.Combine(tempDir, ExeName);
             if (!File.Exists(exe))
@@ -299,12 +299,24 @@ public sealed class InstallService : IInstallService
 
         if (string.IsNullOrWhiteSpace(location))
         {
-            AppendLog("完整性检查: 未安装（无注册表记录）");
-            return new InstallStatus
+            // 注册表没记录 ≠ 没安装。
+            // 默认安装目录里可能还留着上次安装的东西（安装中断、卸载没清干净、手动删过注册表）。
+            // 不看目录就判 NotInstalled，会让「修复安装」直接放弃 ——
+            // 结果是主程序、快捷方式、开始菜单全都缺着。
+            var fallback = DefaultInstallDirectory;
+
+            if (!Directory.Exists(fallback))
             {
-                State = InstallState.NotInstalled,
-                Detail = "无安装注册表记录",
-            };
+                AppendLog("完整性检查: 未安装（无注册表记录）");
+                return new InstallStatus
+                {
+                    State = InstallState.NotInstalled,
+                    Detail = "无安装注册表记录",
+                };
+            }
+
+            AppendLog($"完整性检查: 无注册表记录，但默认安装目录存在，按它检查：{fallback}");
+            location = fallback;
         }
 
         var exePath = Path.Combine(location, ExeName);
@@ -376,7 +388,7 @@ public sealed class InstallService : IInstallService
             AppendLog($"开始修复安装（{status.State}）：{currentDir} → {installDir}");
 
             Directory.CreateDirectory(installDir);
-            CopyDirectory(currentDir, installDir);
+            CopyProgramFiles(currentDir, installDir);
 
             var exePath = Path.Combine(installDir, ExeName);
             var expected = new FileInfo(Path.Combine(currentDir, ExeName)).Length;
@@ -538,26 +550,130 @@ public sealed class InstallService : IInstallService
         }
     }
 
-    private static void CopyDirectory(string source, string target)
+    /// <summary>
+    /// 挑出属于「本程序」的文件 —— 安装时**只**复制这些。
+    /// <para>
+    /// 历史故障（用户实测截图）：安装向导把来源目录里的**所有**文件都复制过去。
+    /// 用户把 exe 放在 Downloads 里 → 整个下载夹（几百个文件、浏览器正在下载的
+    /// <c>.crdownload</c>、Office 临时文件、杀软正在扫描的文件）全被复制，
+    /// 碰到被占用的文件就卡死在「正在复制程序文件…」。
+    /// </para>
+    /// <para>
+    /// 单文件自包含发布时 exe 就是全部 → 只复制它自己；
+    /// 文件夹发布时还需要主 dll、运行时配置与资源目录。
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<string> CollectProgramFiles(string source)
     {
-        foreach (var dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+        var files = new List<string>();
+
+        if (!Directory.Exists(source))
         {
-            var relative = Path.GetRelativePath(source, dir);
-            Directory.CreateDirectory(Path.Combine(target, relative));
+            return files;
         }
 
-        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        // 1) 主程序 exe —— 必须有
+        var exe = Path.Combine(source, ExeName);
+
+        if (File.Exists(exe))
         {
+            files.Add(exe);
+        }
+
+        var stem = Path.GetFileNameWithoutExtension(ExeName);
+
+        // 2) 文件夹发布时的托管程序集与运行时配置（单文件发布时这些不存在）
+        foreach (var candidate in new[] { stem + ".dll", stem + ".deps.json", stem + ".runtimeconfig.json" })
+        {
+            var path = Path.Combine(source, candidate);
+
+            if (File.Exists(path))
+            {
+                files.Add(path);
+            }
+        }
+
+        // 3) 资源目录（单文件发布时资源已嵌进 bundle，这里不存在）
+        foreach (var dirName in new[] { "Assets", "Resources" })
+        {
+            var dir = Path.Combine(source, dirName);
+
+            if (!Directory.Exists(dir))
+            {
+                continue;
+            }
+
+            try
+            {
+                files.AddRange(Directory.GetFiles(dir, "*", SearchOption.AllDirectories));
+            }
+            catch
+            {
+                // 目录读不到就跳过，绝不能因此卡住安装
+            }
+        }
+
+        return files;
+    }
+
+    /// <summary>
+    /// 把「本程序的文件」复制到目标目录。
+    /// <para>
+    /// 只复制 <see cref="CollectProgramFiles"/> 挑出来的文件 —— 绝不碰用户目录里的其他东西。
+    /// 单个文件被占用（浏览器正在下载 / Office 临时文件 / 杀软扫描）时跳过并记账，
+    /// 不再无限卡死；主程序复制失败则直接报错。
+    /// </para>
+    /// </summary>
+    private int CopyProgramFiles(string source, string target, IProgress<string>? progress = null)
+    {
+        var files = CollectProgramFiles(source);
+
+        if (files.Count == 0)
+        {
+            throw new InvalidOperationException($"在 {source} 里找不到 {ExeName}，无法安装。");
+        }
+
+        var copied = 0;
+        var skipped = 0;
+
+        for (var i = 0; i < files.Count; i++)
+        {
+            var file = files[i];
             var relative = Path.GetRelativePath(source, file);
             var destination = Path.Combine(target, relative);
             var destinationDir = Path.GetDirectoryName(destination);
-            if (!string.IsNullOrEmpty(destinationDir))
-            {
-                Directory.CreateDirectory(destinationDir);
-            }
 
-            File.Copy(file, destination, true);
+            progress?.Report($"正在复制程序文件…({i + 1}/{files.Count})");
+
+            try
+            {
+                if (!string.IsNullOrEmpty(destinationDir))
+                {
+                    Directory.CreateDirectory(destinationDir);
+                }
+
+                File.Copy(file, destination, true);
+                copied++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                var isMainProgram = string.Equals(file, Path.Combine(source, ExeName), StringComparison.OrdinalIgnoreCase);
+
+                if (isMainProgram)
+                {
+                    throw new InvalidOperationException(
+                        $"复制主程序失败：{file}\n{ex.Message}\n请关闭正在占用该文件的程序后重试。",
+                        ex);
+                }
+
+                skipped++;
+                AppendLog($"安装：跳过被占用的文件 {relative}（{ex.GetType().Name}）");
+            }
         }
+
+        AppendLog($"安装：复制 {copied} 个文件，跳过 {skipped} 个被占用的文件。");
+
+        return copied;
     }
 
     /// <summary>
