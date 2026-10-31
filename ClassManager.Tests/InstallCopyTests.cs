@@ -66,7 +66,7 @@ public class InstallCopyTests : IDisposable
         Assert.EndsWith("ClassManager.App.exe", files[0], StringComparison.Ordinal);
     }
 
-    /// <summary>文件夹发布形态：exe + 主 dll + 运行时配置 + 资源目录都要带上。</summary>
+    /// <summary>文件夹发布形态：exe + 主 dll + 运行时配置，按精确文件名挑。</summary>
     [Fact]
     public void Folder_deployment_files_are_collected()
     {
@@ -78,21 +78,47 @@ public class InstallCopyTests : IDisposable
         File.WriteAllText(Path.Combine(source, "ClassManager.App.deps.json"), "{}");
         File.WriteAllText(Path.Combine(source, "ClassManager.App.runtimeconfig.json"), "{}");
 
-        Directory.CreateDirectory(Path.Combine(source, "Assets", "engine"));
-        File.WriteAllText(Path.Combine(source, "Assets", "engine", "payload.zip"), "zip");
-
         // 不该被带上的
         File.WriteAllText(Path.Combine(source, "readme.txt"), "user file");
 
         var files = Collect(source);
         var names = files.Select(Path.GetFileName).ToList();
 
+        Assert.Equal(4, files.Count);
         Assert.Contains("ClassManager.App.exe", names);
         Assert.Contains("ClassManager.App.dll", names);
         Assert.Contains("ClassManager.App.deps.json", names);
         Assert.Contains("ClassManager.App.runtimeconfig.json", names);
-        Assert.Contains("payload.zip", names);
         Assert.DoesNotContain("readme.txt", names);
+    }
+
+    /// <summary>
+    /// 复刻真实事故：用户 Downloads 里正好有 <c>Resources</c> / <c>resources</c> 目录
+    /// （某个游戏的贴图，22 个文件）。旧代码把目录名当白名单 → 整个复制进安装目录。
+    /// Windows 大小写不敏感，连小写版也一起中招。
+    /// </summary>
+    [Fact]
+    public void Resources_directory_next_to_exe_is_ignored()
+    {
+        var source = Path.Combine(_root, "Downloads");
+        Directory.CreateDirectory(source);
+        File.WriteAllText(Path.Combine(source, "ClassManager.App.exe"), "fake exe");
+
+        foreach (var dirName in new[] { "Resources", "resources", "Assets" })
+        {
+            var d = Path.Combine(source, dirName, "background_clothing_conf", "icon");
+            Directory.CreateDirectory(d);
+
+            for (var i = 0; i < 5; i++)
+            {
+                File.WriteAllText(Path.Combine(d, $"icon{i}.png"), "png");
+            }
+        }
+
+        var files = Collect(source);
+
+        Assert.Single(files);
+        Assert.EndsWith("ClassManager.App.exe", files[0], StringComparison.Ordinal);
     }
 
     /// <summary>来源目录里没有主程序 → 明确报错，而不是复制一堆无关文件。</summary>
