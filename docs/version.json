@@ -1,13 +1,13 @@
 {
-  "version": "0.33",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.33/ClassManager.App.exe",
+  "version": "0.34",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.34/ClassManager.App.exe",
   "size": 82805167,
-  "sha256": "3e90e6e0e81f395b3f2c5514877a8bc82c84fdb86fb596c68ebd1e59affbdc14",
-  "notes": "chore: 更新更新清单 v0.32",
+  "sha256": "8d9dff49d69b66cffce98787fc8f341c202c67189d65d288c4729a4e2d42068d",
+  "notes": "fix: 构建版本号用 tag，发布脚本同步 csproj 版本（否则 exe 内部版本与 tag 不一致会反复提示更新）",
   "publishedAt": "2026-10-31",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.33/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.33/ClassManager.App.exe"
+    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.34/ClassManager.App.exe",
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.34/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
