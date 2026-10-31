@@ -75,23 +75,32 @@ public static class UpdatePublisher
         var fileName = Path.GetFileName(packagePath);
         var target = Path.Combine(directory, fileName);
 
-        try
+        var isGitHubMode = !string.IsNullOrWhiteSpace(githubRepo);
+
+        // GitHub 模式：安装包由 GitHub Actions 上传到 Release 附件，
+        // 不该复制进清单目录（那是仓库目录，78MB 会把仓库撑大，jsDelivr 也不分发大文件）
+        if (!isGitHubMode)
         {
-            // 同名文件可能正被占用（自己就在运行），先删再拷
-            if (File.Exists(target))
+            try
             {
-                File.Delete(target);
+                // 同名文件可能正被占用（自己就在运行），先删再拷
+                if (File.Exists(target))
+                {
+                    File.Delete(target);
+                }
+
+                File.Copy(packagePath, target);
             }
-
-            File.Copy(packagePath, target);
-        }
-        catch (Exception ex)
-        {
-            return $"复制安装包到更新源失败：{ex.Message}";
+            catch (Exception ex)
+            {
+                return $"复制安装包到更新源失败：{ex.Message}";
+            }
         }
 
-        var size = new FileInfo(target).Length;
-        var sha = ComputeSha256(target);
+        // 注意：从**源包**算大小与校验值。GitHub 模式下安装包不会复制到清单目录
+        // （它由 Actions 上传到 Release），从 target 算会找不到文件。
+        var size = new FileInfo(packagePath).Length;
+        var sha = ComputeSha256(packagePath);
         var effectiveVersion = string.IsNullOrWhiteSpace(version) ? AppVersion.Current : version.Trim();
 
         // GitHub 模式：下载地址指向 Releases 附件，下载页指向 Releases 列表页

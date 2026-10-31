@@ -2,7 +2,7 @@
   "version": "0.31",
   "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.31/ClassManager.App.exe",
   "size": 82754607,
-  "sha256": "7e4882e16bf2bbf603ccda0013492e2117817bd95cbfd2ea78f80d8550b157ba",
+  "sha256": "115713f5cd663966ded6751fe961799b3910568323b6c795c937a5da4dd17d6a",
   "notes": "v0.31：GitHub Actions 自动发布 + 清单自动破缓存 + 加速镜像自动回退",
   "publishedAt": "2026-10-31",
   "mirrors": [
