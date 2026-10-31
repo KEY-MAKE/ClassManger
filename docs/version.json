@@ -1,13 +1,13 @@
 {
-  "version": "0.35",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.35/ClassManager.App.exe",
+  "version": "0.36",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.36/ClassManager.App.exe",
   "size": 82806703,
-  "sha256": "579881ca73e9ce456d7671ea35d4fe8cc1cec11efdd068c7e46c61276fe88d9c",
-  "notes": "fix: 安装只复制本程序文件，不再递归复制整个来源目录（Downloads 里卡死的根因）",
+  "sha256": "ea13839a7231d970831ae365e5159ee090f8d4fe0e1a7bc0649d1eda857b5ff9",
+  "notes": "chore: 0.36（安装目录清理验证版）",
   "publishedAt": "2026-10-31",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.35/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.35/ClassManager.App.exe"
+    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.36/ClassManager.App.exe",
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.36/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
