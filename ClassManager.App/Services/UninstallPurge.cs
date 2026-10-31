@@ -65,17 +65,36 @@ public static class UninstallPurge
         }
 
         // 5) 安装目录（带时间预算的重试：先尽力清空内容再删目录）
-        var cleaned = string.IsNullOrWhiteSpace(installDir)
+        //
+        // 【安全闸】这里拿到的路径来自命令行。真实事故：用户在 Downloads 里双击 exe，
+        // 注册表无记录 → 旧代码把「当前程序所在目录」当成安装目录 → 这一行
+        // 递归删光了整个下载夹（用户数据永久丢失，不进回收站）。
+        // 因此删除前必须确认它确实像本程序的安装目录，否则宁可不动。
+        var safeToDelete = InstallService.IsSafeUninstallTarget(installDir, out var unsafeReason);
+
+        if (!safeToDelete)
+        {
+            ConsoleHost.WriteLine($"跳过安装目录删除：{unsafeReason}");
+            ConsoleHost.WriteLine($"  路径：{installDir}");
+            ConsoleHost.WriteLine("  如需清理，请手动删除该目录（或重新安装后再卸载）。");
+            AppendLog($"卸载清理：跳过安装目录删除（{unsafeReason}），installDir={installDir}");
+        }
+
+        var cleaned = !safeToDelete
+                      || string.IsNullOrWhiteSpace(installDir)
                       || !Directory.Exists(installDir)
                       || TryDeleteWithBudget(installDir, DeleteBudgetMs);
 
-        ConsoleHost.WriteLine(cleaned
-            ? $"安装目录已彻底删除: {installDir}"
-            : $"警告：安装目录未能完全删除: {installDir}");
+        if (safeToDelete)
+        {
+            ConsoleHost.WriteLine(cleaned
+                ? $"安装目录已彻底删除: {installDir}"
+                : $"警告：安装目录未能完全删除: {installDir}");
 
-        AppendLog(cleaned
-            ? $"卸载清理：安装目录已删除 {installDir}"
-            : $"卸载清理：安装目录未能完全删除 {installDir}");
+            AppendLog(cleaned
+                ? $"卸载清理：安装目录已删除 {installDir}"
+                : $"卸载清理：安装目录未能完全删除 {installDir}");
+        }
 
         // 6) 自身所在的临时目录（含自身 exe）——自身正在运行，必须延迟到退出后再删
         var selfDir = AppContext.BaseDirectory.TrimEnd(
