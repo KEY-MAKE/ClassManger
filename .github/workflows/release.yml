@@ -85,8 +85,8 @@ jobs:
           body: |
             由 GitHub Actions 自动构建。
 
-            下载慢的话，把地址前面的 `https://github.com` 换成
-            `https://api.gitproxy.dev/https://github.com` 会快很多。
+            下载慢的话，把地址前面的 `https://release-assets.githubusercontent.com` 换成
+            `https://api.gitproxy.dev/release-assets.githubusercontent.com` 会快很多。
 
       - name: 把清单提交回仓库（方便 jsDelivr 直接读）
         shell: pwsh
