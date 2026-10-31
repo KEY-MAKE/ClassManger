@@ -1,13 +1,13 @@
 {
-  "version": "0.38",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.38/ClassManager.App.exe",
+  "version": "0.39",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.39/ClassManager.App.exe",
   "size": 82808405,
-  "sha256": "78dd8d0e6942a62811fc34689ebb2acbcbf5e3fd58f81889372420caf7fb5ece",
-  "notes": "chore: 清理临时测试脚本",
+  "sha256": "7f018962c246582a9160df1d94b8cfef270c91f824b58ee64a3384ccbce93d9b",
+  "notes": "fix(严重): 安装不再复制 Assets/Resources 目录（用户下载夹里的同名游戏资源被误复制进安装目录）",
   "publishedAt": "2026-10-31",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.38/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.38/ClassManager.App.exe"
+    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.39/ClassManager.App.exe",
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.39/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
