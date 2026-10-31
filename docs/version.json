@@ -1,13 +1,13 @@
 {
-  "version": "0.31",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.31/ClassManager.App.exe",
+  "version": "0.32",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.32/ClassManager.App.exe",
   "size": 82805167,
-  "sha256": "fc9c600db81849210f6c90dd4feeebdb8920136f15da2b06cd6c30410ca7a2d1",
-  "notes": "fix: Actions 推送清单要显式指定 HEAD:main（tag 触发时是 detached HEAD）",
+  "sha256": "3e90e6e0e81f395b3f2c5514877a8bc82c84fdb86fb596c68ebd1e59affbdc14",
+  "notes": "fix: 版本号改读程序集自身；README 标注推荐用 releases/latest/download 更新源",
   "publishedAt": "2026-10-31",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.31/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.31/ClassManager.App.exe"
+    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.32/ClassManager.App.exe",
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.32/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
