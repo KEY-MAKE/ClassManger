@@ -1,13 +1,13 @@
 {
-  "version": "0.34",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.34/ClassManager.App.exe",
-  "size": 82805167,
-  "sha256": "8d9dff49d69b66cffce98787fc8f341c202c67189d65d288c4729a4e2d42068d",
-  "notes": "fix: 构建版本号用 tag，发布脚本同步 csproj 版本（否则 exe 内部版本与 tag 不一致会反复提示更新）",
+  "version": "0.35",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.35/ClassManager.App.exe",
+  "size": 82806703,
+  "sha256": "579881ca73e9ce456d7671ea35d4fe8cc1cec11efdd068c7e46c61276fe88d9c",
+  "notes": "fix: 安装只复制本程序文件，不再递归复制整个来源目录（Downloads 里卡死的根因）",
   "publishedAt": "2026-10-31",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.34/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.34/ClassManager.App.exe"
+    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.35/ClassManager.App.exe",
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.35/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
