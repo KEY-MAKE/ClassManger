@@ -28,6 +28,53 @@ public sealed class InstallService : IInstallService
     }
 
     /// <summary>
+    /// 安装标记文件名。安装成功时写在安装目录里，内容是安装时间 + 版本 + 随机 token。
+    /// <para>
+    /// 卸载时**必须**找到它才允许删目录 —— 这是"这个目录确实是我们装的"的唯一证据。
+    /// 光看目录名或有没有 exe 都不够：用户下载的 exe 也在 Downloads 里，
+    /// 只看文件名就会把下载夹当成安装目录（真实事故，已造成数据丢失）。
+    /// </para>
+    /// </summary>
+    private const string InstallMarkerFileName = ".classmanager-install";
+
+    /// <summary>在安装目录写入标记文件。</summary>
+    private static void WriteInstallMarker(string installDir)
+    {
+        try
+        {
+            var content = string.Join(
+                Environment.NewLine,
+                $"installedAt={DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                $"version={AppVersion.Current}",
+                $"token={Guid.NewGuid():N}");
+
+            File.WriteAllText(Path.Combine(installDir, InstallMarkerFileName), content);
+        }
+        catch
+        {
+            // 写不了标记不算安装失败，但该目录之后将无法通过"卸载"删除（安全第一）
+        }
+    }
+
+    /// <summary>该目录里有没有我们写的安装标记。</summary>
+    public static bool HasInstallMarker(string? dir)
+    {
+        if (string.IsNullOrWhiteSpace(dir))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(Path.Combine(dir, InstallMarkerFileName));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 删除前的最后一道安全闸：判断某个路径能不能当"安装目录"删掉。
     /// <para>
     /// 真实事故（用户数据丢失）：在 <c>Downloads</c> 里双击 exe → 注册表无记录 →
@@ -116,13 +163,19 @@ public sealed class InstallService : IInstallService
             return false;
         }
 
-        // 必须像本程序的安装目录：有主程序，或目录名就是 ClassManager
-        var hasExe = File.Exists(Path.Combine(full, ExeName));
-        var namedRight = string.Equals(Path.GetFileName(full), "ClassManager", StringComparison.OrdinalIgnoreCase);
-
-        if (!hasExe && !namedRight)
+        // 唯一可信的证据：安装时写下的标记文件。
+        // 只看目录名或有没有 exe 都不够 —— 用户下载的 exe 也躺在 Downloads 里，
+        // 凭「有 exe」就把下载夹当安装目录删掉，是已经发生过的事故。
+        if (!HasInstallMarker(full))
         {
-            reason = "目录里没有本程序，且目录名不是 ClassManager";
+            reason = $"目录里没有安装标记（{InstallMarkerFileName}），无法确认是本程序的安装目录";
+            return false;
+        }
+
+        // 有标记的目录还必须真的装着主程序（标记 + exe 双条件）
+        if (!File.Exists(Path.Combine(full, ExeName)))
+        {
+            reason = "目录里有安装标记但缺少主程序";
             return false;
         }
 
@@ -292,6 +345,7 @@ public sealed class InstallService : IInstallService
 
         progress?.Report("正在写入卸载信息...");
         WriteUninstallRegistry(target, exePath);
+        WriteInstallMarker(target);
 
         AppendLog($"安装完成（{AppVersion.Display}）：{target}");
         progress?.Report("安装完成。");
@@ -552,6 +606,7 @@ public sealed class InstallService : IInstallService
                 installDir);
 
             WriteUninstallRegistry(installDir, exePath);
+            WriteInstallMarker(installDir);
 
             message = $"已修复安装到 {AppVersion.Display}（{actual:N0} 字节）。";
             AppendLog(message);

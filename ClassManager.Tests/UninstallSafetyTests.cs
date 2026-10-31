@@ -105,6 +105,9 @@ public class UninstallSafetyTests : IDisposable
         Directory.CreateDirectory(install);
         File.WriteAllText(Path.Combine(install, "ClassManager.App.exe"), "exe");
 
+        // 必须先有安装标记 —— 这是「这个目录确实是我们装的」的唯一证据
+        File.WriteAllText(Path.Combine(install, ".classmanager-install"), "installedAt=2026-10-31");
+
         Assert.True(IsSafe(install), "正常的安装目录必须能卸载");
 
         Assert.True(InstallService.IsSafeUninstallTarget(install, out var reason), reason);
@@ -119,19 +122,48 @@ public class UninstallSafetyTests : IDisposable
         File.WriteAllText(Path.Combine(install, "ClassManager.App.exe"), "exe");
         File.WriteAllText(Path.Combine(install, "ClassManager.App.dll"), "dll");
         File.WriteAllText(Path.Combine(install, "Assets", "icon.ico"), "ico");
+        File.WriteAllText(Path.Combine(install, ".classmanager-install"), "installedAt=2026-10-31");
 
         Assert.True(IsSafe(install));
     }
 
-    /// <summary>目录名是 ClassManager 且内容不多 → 允许（残留的半装状态也能清）。</summary>
+    /// <summary>只有目录名像，没有安装标记 → 必须拒绝。</summary>
     [Fact]
-    public void Directory_named_classmanager_is_allowed()
+    public void Directory_named_classmanager_without_marker_is_rejected()
     {
         var install = Path.Combine(_root, "ClassManager");
         Directory.CreateDirectory(install);
         File.WriteAllText(Path.Combine(install, "leftover.log"), "x");
 
-        Assert.True(IsSafe(install));
+        Assert.False(IsSafe(install), "光名字对不算，必须有安装标记");
+    }
+
+    /// <summary>有标记但主程序没了（半装状态）→ 仍然拒绝（不猜）。</summary>
+    [Fact]
+    public void Marker_without_executable_is_rejected()
+    {
+        var install = Path.Combine(_root, "ClassManager");
+        Directory.CreateDirectory(install);
+        File.WriteAllText(Path.Combine(install, ".classmanager-install"), "x");
+
+        Assert.False(IsSafe(install));
+    }
+
+    /// <summary>这次事故的完整复刻：Downloads 里有 exe、也有标记，但内容太多 → 依然拒绝。</summary>
+    [Fact]
+    public void Downloads_with_marker_and_exe_is_still_rejected()
+    {
+        var fake = Path.Combine(_root, "Downloads");
+        Directory.CreateDirectory(fake);
+        File.WriteAllText(Path.Combine(fake, "ClassManager.App.exe"), "exe");
+        File.WriteAllText(Path.Combine(fake, ".classmanager-install"), "x");
+
+        for (var i = 0; i < 30; i++)
+        {
+            File.WriteAllText(Path.Combine(fake, $"f{i}.bin"), "x");
+        }
+
+        Assert.False(IsSafe(fake));
     }
 
     /// <summary>名字不相关、也没本程序 → 拒绝（不能拿它当安装目录删）。</summary>
