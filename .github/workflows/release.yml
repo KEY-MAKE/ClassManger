@@ -27,6 +27,10 @@ jobs:
 
       - name: 构建单文件 exe
         run: |
+          # 版本号必须用 tag，否则 exe 内部版本和 tag 对不上：
+          # 程序会认为「线上比自己新」→ 反复提示更新，装了也停不下来。
+          $ver = "${{ github.ref_name }}".TrimStart('v')
+
           dotnet publish ClassManager.App/ClassManager.App.csproj `
             -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=true `
@@ -35,6 +39,7 @@ jobs:
             -p:PublishReadyToRun=false `
             -p:DebugType=none `
             -p:SatelliteResourceLanguages=zh-Hans `
+            -p:Version=$ver `
             -o publish
 
       - name: 生成更新清单 version.json

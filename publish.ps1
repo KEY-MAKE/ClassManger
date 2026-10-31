@@ -50,6 +50,21 @@ if (-not $Version) {
     }
     $Version = $m.Groups[1].Value.Trim()
 }
+
+# 把 csproj 的版本同步成目标版本。
+# 不然本地构建出来的 exe 内部版本会和 tag 对不上：
+# 程序会认为「线上版本比自己新」→ 反复提示更新，装了也停不下来。
+$csprojPath = 'ClassManager.App\ClassManager.App.csproj'
+$csprojText = Get-Content $csprojPath -Raw
+$updated = [regex]::Replace($csprojText, '<Version>[^<]+</Version>', "<Version>$Version</Version>")
+$updated = [regex]::Replace($updated, '<AssemblyVersion>[^<]+</AssemblyVersion>', "<AssemblyVersion>$Version.0</AssemblyVersion>")
+$updated = [regex]::Replace($updated, '<FileVersion>[^<]+</FileVersion>', "<FileVersion>$Version.0</FileVersion>")
+
+if ($updated -ne $csprojText) {
+    [System.IO.File]::WriteAllText((Resolve-Path $csprojPath), $updated, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "    已把 csproj 版本同步为 $Version" -ForegroundColor DarkGray
+}
+
 Write-Host "==> 版本号：$Version" -ForegroundColor Cyan
 
 $tag = "v$Version"
