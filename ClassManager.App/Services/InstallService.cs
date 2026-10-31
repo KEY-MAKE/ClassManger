@@ -27,6 +27,125 @@ public sealed class InstallService : IInstallService
         _authorProvider = authorProvider;
     }
 
+    /// <summary>
+    /// 删除前的最后一道安全闸：判断某个路径能不能当"安装目录"删掉。
+    /// <para>
+    /// 真实事故（用户数据丢失）：在 <c>Downloads</c> 里双击 exe → 注册表无记录 →
+    /// 旧代码把「当前程序所在目录」当成安装目录 → <c>--purge</c> 递归删光了整个下载夹。
+    /// </para>
+    /// <para>
+    /// 因此这里宁可拒绝删除（让用户手动清），也绝不允许误删用户目录。
+    /// </para>
+    /// </summary>
+    public static bool IsSafeUninstallTarget(string? dir, out string reason)
+    {
+        reason = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(dir))
+        {
+            reason = "安装目录为空";
+            return false;
+        }
+
+        string full;
+
+        try
+        {
+            full = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch
+        {
+            reason = "路径无法解析";
+            return false;
+        }
+
+        var root = Path.GetPathRoot(full)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (!string.IsNullOrEmpty(root) && string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "不能删除盘根目录";
+            return false;
+        }
+
+        // 用户常见目录：绝不允许被"卸载"删除
+        var protectedPaths = new List<string>
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            Path.GetTempPath(),
+
+            // 下载目录不对应 SpecialFolder，按用户目录拼
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
+        };
+
+        foreach (var candidate in protectedPaths)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                continue;
+            }
+
+            string c;
+
+            try
+            {
+                c = Path.GetFullPath(candidate).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (string.Equals(full, c, StringComparison.OrdinalIgnoreCase))
+            {
+                reason = $"这是系统/用户目录，不是安装目录：{c}";
+                return false;
+            }
+        }
+
+        if (!Directory.Exists(full))
+        {
+            reason = "目录不存在";
+            return false;
+        }
+
+        // 必须像本程序的安装目录：有主程序，或目录名就是 ClassManager
+        var hasExe = File.Exists(Path.Combine(full, ExeName));
+        var namedRight = string.Equals(Path.GetFileName(full), "ClassManager", StringComparison.OrdinalIgnoreCase);
+
+        if (!hasExe && !namedRight)
+        {
+            reason = "目录里没有本程序，且目录名不是 ClassManager";
+            return false;
+        }
+
+        // 最后一道：安装目录里只应该有本程序的少数文件。
+        // 一个塞满几百项文件的目录（比如下载夹）绝不可能是安装目录。
+        try
+        {
+            if (Directory.EnumerateFileSystemEntries(full).Take(21).Count() > 20)
+            {
+                reason = "目录内容过多，不像安装目录";
+                return false;
+            }
+        }
+        catch
+        {
+            // 读不了就按安全处理
+            reason = "无法枚举目录内容";
+            return false;
+        }
+
+        return true;
+    }
+
     /// <inheritdoc />
     public string CurrentProcessDirectory =>
         AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -235,9 +354,14 @@ public sealed class InstallService : IInstallService
 
         // 4) 调度延迟自删除：本进程退出后删除安装目录。
         //    即使当前进程正运行于安装目录之内也可安全删除（脚本会先等待本 PID 退出）。
-        if (!string.IsNullOrWhiteSpace(installDir) && Directory.Exists(installDir))
+        // 只删注册表记录的那个目录，且必须通过安全闸 —— 绝不猜路径
+        if (IsSafeUninstallTarget(installDir, out var unsafeReason) && installDir is not null)
         {
             ScheduleSelfDelete(installDir);
+        }
+        else
+        {
+            AppendLog($"跳过安装目录删除：{unsafeReason}（installDir={installDir}）");
         }
     }
 
@@ -246,11 +370,15 @@ public sealed class InstallService : IInstallService
     {
         try
         {
-            // 目标安装目录：优先注册表 InstallLocation，回退当前程序所在目录
+            // 目标安装目录**只认注册表记录**。
+            // 绝对不能回退到「当前程序所在目录」：用户在 Downloads 里双击 exe 时，
+            // 那就是 Downloads，后面的 --purge 会把整个下载夹递归删光（真实事故，已造成用户数据丢失）。
             var installDir = ReadInstallLocation();
-            if (string.IsNullOrWhiteSpace(installDir) || !Directory.Exists(installDir))
+
+            if (!IsSafeUninstallTarget(installDir, out var unsafeReason))
             {
-                installDir = CurrentProcessDirectory;
+                AppendLog($"拒绝启动卸载器：{unsafeReason}（installDir={installDir}）");
+                return false;
             }
 
             var source = CurrentProcessDirectory;
@@ -279,7 +407,7 @@ public sealed class InstallService : IInstallService
             };
             psi.ArgumentList.Add("--purge");
             psi.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
-            psi.ArgumentList.Add(installDir);
+            psi.ArgumentList.Add(installDir!);
             psi.ArgumentList.Add(removeUserSettings ? "true" : "false");
 
             Process.Start(psi);
@@ -299,15 +427,20 @@ public sealed class InstallService : IInstallService
 
         if (string.IsNullOrWhiteSpace(location))
         {
-            // 注册表没记录 ≠ 没安装。
-            // 默认安装目录里可能还留着上次安装的东西（安装中断、卸载没清干净、手动删过注册表）。
-            // 不看目录就判 NotInstalled，会让「修复安装」直接放弃 ——
-            // 结果是主程序、快捷方式、开始菜单全都缺着。
+            // 注册表没记录 ≠ 没安装，但也**不能**无条件去看默认安装目录。
+            //
+            // 真实事故：用户在 Downloads 里双击 exe，旧逻辑去查默认安装目录，
+            // 发现那里有个装好的旧版本 → 判定「已安装」→ 不弹安装向导、直接进主界面，
+            // 随后点卸载把 Downloads 当成了安装目录（数据丢失）。
+            //
+            // 所以只有「当前程序本身就跑在默认安装目录里」时才用目录兜底 ——
+            // 那种情况是注册表丢了（卸载没清干净/手动删过），应该能自我修复。
             var fallback = DefaultInstallDirectory;
+            var runningFromInstallDir = PathsEqual(CurrentProcessDirectory, fallback);
 
-            if (!Directory.Exists(fallback))
+            if (!runningFromInstallDir || !Directory.Exists(fallback))
             {
-                AppendLog("完整性检查: 未安装（无注册表记录）");
+                AppendLog($"完整性检查: 未安装（无注册表记录，运行目录={CurrentProcessDirectory}）");
                 return new InstallStatus
                 {
                     State = InstallState.NotInstalled,
@@ -315,7 +448,7 @@ public sealed class InstallService : IInstallService
                 };
             }
 
-            AppendLog($"完整性检查: 无注册表记录，但默认安装目录存在，按它检查：{fallback}");
+            AppendLog($"完整性检查: 无注册表记录，但当前就在默认安装目录里运行，按它检查：{fallback}");
             location = fallback;
         }
 
