@@ -98,7 +98,10 @@ jobs:
           git diff --staged --quiet
           if ($LASTEXITCODE -ne 0) {
             git commit -m "chore: 更新更新清单 ${{ github.ref_name }}"
-            git push
+
+            # 必须显式指定目标分支：tag 触发时 checkout 处于 detached HEAD，
+            # 直接 `git push` 会报「You are not currently on a branch.」
+            git push origin HEAD:main
           } else {
             Write-Host '清单无变化，跳过提交'
           }
