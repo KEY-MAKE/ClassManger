@@ -1,0 +1,166 @@
+%% 班级综合管理系统 · 关键流程时序（6 张）
+%% ① 启动判定（已安装/未安装 → 向导 or 主界面，含单实例抢占）
+
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant App as App.xaml.cs(组合根)
+    participant SI as SingleInstanceService
+    participant WA as WindowActivationService
+    participant IS as InstallService
+    participant TS as ThemeService
+    participant M as MainWindow
+    participant W as InstallWizardWindow
+
+    U->>App: 双击启动
+    App->>SI: Acquire()
+    alt 已有实例(非首实例)
+        SI->>SI: SignalFirstInstance()  // EventWaitHandle.Set()
+        App-->>U: 直接退出(不新开窗口)
+        Note over SI,WA: 实例1 后台线程 WaitOne 触发 ActivatedBySecondInstance
+        SI-->>M: 事件
+        M->>WA: BringToFront(主窗口)
+        WA-->>U: 主窗口置前
+    else 首实例
+        App->>SI: StartListening()
+        App->>IS: IsInstalled?
+        alt 未安装
+            App->>W: new InstallWizardWindow()
+            W-->>U: 显示安装向导
+        else 已安装
+            App->>TS: Attach(MainWindow) + Apply(Preference)
+            App->>M: new MainWindow(ViewModel)
+            M-->>U: 显示主界面(占位点名页)
+        end
+    end
+
+%% ② 导入成绩单（选文件 → 列识别 → 降序排序 → 刷新）
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant VM as MainWindowViewModel/I*ViewModel
+    participant IS as ImportService
+    participant SS as SettingsService
+    participant RS as RollCallService
+    participant SG as SeatingService
+    participant UI as 点名页/座位页
+
+    U->>VM: 点击「导入成绩单」(或空状态按钮)
+    VM->>SS: 读取 LastImportDirectory
+    VM->>U: OpenFileDialog(filter: *.xlsx;*.csv)
+    U-->>VM: 选定 filePath
+    VM->>IS: IsLegacyXls(filePath)?
+    alt 是 .xls
+        IS-->>VM: ImportException(明确提示)
+        VM-->>U: MessageBox「请另存为 .xlsx/.csv」(不破坏现有数据)
+    else 正常
+        VM-->>VM: 状态栏「正在导入...」
+        VM->>IS: Import(filePath, GenerateDemoScores)
+        IS->>IS: MiniExcel.Query 读表 → 识别姓名列/成绩列
+        alt 未命中成绩列 且 GenerateDemoScores
+            IS->>IS: 生成 60–100 随机成绩(标记 GeneratedDemoScores)
+        end
+        IS->>IS: 去空 + 成绩不足补 0 + 按成绩降序排序
+        IS-->>VM: ImportResult
+        VM->>RS: LoadRoster(students)      // 清空点名记录
+        VM->>SG: LoadRoster(students) + ClearAll()  // 清空座位安排
+        VM->>UI: 刷新名单表格/统计/空状态/大字号结果
+        VM->>VM: 更新班级信息「班级: 高二(3)班 | 人数: 55」
+        VM->>SS: 保存 LastImportDirectory; Save()
+        VM-->>U: InfoBar/Toast「成功导入 N 名学生，已按成绩排序」
+    end
+
+%% ③ 点名（三模式）
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant VM as RollCallViewModel
+    participant RS as RollCallService
+    participant SB as MainWindowViewModel(Toast)
+
+    U->>VM: 点击「随机点名」(快捷键 F5/Space)
+    VM->>RS: Roll()  // 依 Mode
+    alt uncalled_only 且已全点完
+        RS-->>VM: null
+        VM-->>U: InfoBar「所有学生都已点到！」
+    else 正常
+        RS-->>VM: RollCallResult(Student, Timestamp, Mode, AlreadyCalled)
+        VM->>VM: ResultText = 姓名(大字号)；更新 Total/Called/Remaining
+        VM->>SB: SetStatus("点到: 张三 - 14:32:05")
+    end
+
+%% ④ 自动排座 + 导出 PNG（白底黑格）
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant VM as SeatViewModel
+    participant SG as SeatingService
+    participant MAP as SeatMapControl
+    participant GEO as SeatMapGeometry
+    participant EX as ExportService
+
+    U->>VM: 点击「按成绩蛇形排列」
+    VM->>SG: ArrangeAuto(SeatAlgorithm.Snake)
+    SG->>SG: 清空 → 偶数行左→右/奇数行右→左填充（row0 之后渲染在最下方）
+    SG-->>VM: Layout 更新
+    VM->>VM: LayoutVersion++ ; 刷新学生按钮(已排座变绿)
+    VM->>MAP: 重绘(绑定 LayoutVersion)
+    MAP->>GEO: ColumnOffsets/RowOffsets/CanvasSize/GroupBlocks/Platform
+    GEO-->>MAP: 坐标与尺寸
+    U->>VM: 点击「导出为图片」
+    VM->>U: SeatExportOptionsWindow(是否包含分组表头与排标签)
+    U-->>VM: includeHeaders
+    VM->>EX: ExportSeatImage(path, Layout, className, now, includeHeaders)
+    EX->>GEO: 复用同一套几何（所见即所得）
+    EX->>EX: BuildSeatSheet → 白底黑格矢量 DrawingVisual → RenderTargetBitmap(96dpi × 2)
+    EX-->>VM: 完成
+    VM-->>U: Toast「座位表已导出为图片: ...」
+
+%% ⑤ 打印座位表（矢量，白底黑格）
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant VM as SeatViewModel
+    participant EX as ExportService
+    participant W as SeatPrintWindow
+    participant PD as PrintDialog
+
+    U->>VM: 点击「打印座位表」
+    VM->>U: SeatExportOptionsWindow(是否包含分组表头与排标签)
+    U-->>VM: includeHeaders
+    VM->>W: new SeatPrintWindow(export, Layout, className, now, includeHeaders)
+    W->>EX: BuildSeatSheet(...) → (DrawingVisual, Size)
+    W->>W: RenderTargetBitmap(scale 1.5) 生成预览 Image
+    U->>W: 点击「打印」
+    W->>PD: ShowDialog()
+    W->>PD: PrintVisual(等比缩放居中的同一矢量对象)  // 可配 Microsoft Print to PDF
+    PD-->>U: 打印/导出 PDF 完成
+
+%% ⑥ 安装向导全流程 + 卸载
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant W as InstallWizardWindow/VM
+    participant IS as InstallService
+    participant SC as ShortcutService
+    participant REG as HKCU注册表
+    participant CMD as cmd(临时脚本)
+
+    Note over U,W: ===== 安装 =====
+    U->>W: 选择安装目录 + 勾选快捷方式 + 点「安装」
+    W->>IS: Install(InstallOptions, progress)
+    IS->>IS: 复制「当前进程目录整体」→ 安装目录
+    IS->>SC: CreateLink(桌面.lnk) / CreateLink(开始菜单.lnk)  // WScript.Shell
+    IS->>REG: 写 HKCU\...\Uninstall\ClassManager(名称/图标/UninstallString/DisplayVersion)
+    IS->>IS: 标记已安装
+    IS-->>W: 完成(进度结束)
+    U->>W: 勾选「安装完成后立即启动」→ 点「完成」
+    W->>IS: LaunchInstalledCopy(dir)  // 启动安装目录副本
+    W-->>U: 向导关闭
+
+    Note over U,W: ===== 卸载(程序内入口) =====
+    U->>W: 关于窗口 →「卸载」
+    W->>IS: Uninstall(removeUserSettings)
+    IS->>IS: 删除快捷方式 + 删除 HKCU 卸载项 + (可选)删除 settings.json
+    IS->>CMD: spawn 临时 cmd：等待 PID 退出 → 删除安装目录 → 删除自身
+    IS-->>U: 提示「正在卸载，程序将退出以完成清理」

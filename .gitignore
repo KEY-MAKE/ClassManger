@@ -1,0 +1,19 @@
+# 构建产物
+bin/
+obj/
+publish/
+*.user
+*.suo
+.vs/
+.vscode/
+
+# 本地配置与数据（不要传到仓库）
+*.local.json
+appsettings.Development.json
+_attachments/
+_conversations/
+_tools/
+
+# 打包中间物
+*.zip
+*.7z

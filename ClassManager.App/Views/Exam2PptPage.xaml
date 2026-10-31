@@ -1,0 +1,210 @@
+<Page x:Class="ClassManager.App.Views.Exam2PptPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="讲评课件"
+      AllowDrop="True"
+      DragOver="OnDragOver"
+      Drop="OnDrop">
+    <Grid x:Name="Root" Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左栏：参数 -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,16,0">
+            <StackPanel>
+                <!-- ① 选择文件 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="① 选择文件" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <TextBlock Text="试题原卷" Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0" Text="{Binding ExamPath, Mode=OneWay}"
+                                        PlaceholderText="选择试题原卷 .docx" IsReadOnly="True"
+                                        ToolTip="{Binding ExamPath}" />
+                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                       Command="{Binding BrowseExamCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="答案解析" Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0" Text="{Binding AnswerPath, Mode=OneWay}"
+                                        PlaceholderText="选择答案解析 .docx" IsReadOnly="True"
+                                        ToolTip="{Binding AnswerPath}" />
+                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                       Command="{Binding BrowseAnswerCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="参考模板（可选）" Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0" Text="{Binding TemplatePath, Mode=OneWay}"
+                                        PlaceholderText="只用来提取背景图，可留空" IsReadOnly="True"
+                                        ToolTip="{Binding TemplatePath}" />
+                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                       Command="{Binding BrowseTemplateCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="输出位置" Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0" Text="{Binding OutputPath, Mode=OneWay}"
+                                        PlaceholderText="课件输出路径 .pptx" IsReadOnly="True"
+                                        ToolTip="{Binding OutputPath}" />
+                            <ui:Button Grid.Column="1" Content="另存…" Margin="8,0,0,0"
+                                       Command="{Binding BrowseOutputCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="也可以把 Word 文件直接拖进本页"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ② 输出设置 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="② 输出设置" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <TextBlock Text="默认与试题同目录、文件名后缀为（讲评课件）.pptx"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" />
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding BackgroundText}"
+                                       Style="{StaticResource CaptionTextStyle}"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding BackgroundText}" />
+                            <ui:Button Grid.Column="1"
+                                       Content="背景设置…"
+                                       Margin="8,0,0,0"
+                                       Command="{Binding ConfigureBackgroundCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ③ 生成内容 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="③ 生成内容" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <CheckBox Content="生成阅读材料页" IsChecked="{Binding GenerateMaterial}" Margin="0,0,0,6" />
+                        <CheckBox Content="生成【导语】页" IsChecked="{Binding GenerateGuide}" Margin="0,0,0,6" />
+                        <CheckBox Content="答案面板写【解析】" IsChecked="{Binding WriteAnalysis}" Margin="0,0,0,6" />
+                        <CheckBox Content="题目页显示答案面板" IsChecked="{Binding ShowAnswerPanel}" Margin="0,0,0,6" />
+                        <CheckBox Content="完成后自动打开课件" IsChecked="{Binding OpenAfterDone}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ④ 操作 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:Button Grid.Column="0" Content="开始生成" Appearance="Primary"
+                                       HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}"
+                                       Command="{Binding StartCommand}" />
+                            <ui:Button Grid.Column="1" Content="取消" Margin="8,0,0,0"
+                                       IsEnabled="{Binding CanCancel}"
+                                       Command="{Binding CancelCommand}" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <ui:Button Content="打开输出目录" Command="{Binding OpenOutputFolderCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="预览解析结构" Command="{Binding PreviewStructureCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="使用说明" Command="{Binding ShowHelpCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 右栏：进度 + 日志 -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource StatCard}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="生成进度" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding StageText}"
+                                       Style="{StaticResource CaptionTextStyle}"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ProgressPercent, StringFormat={}{0:0}%}"
+                                       Style="{StaticResource CaptionTextStyle}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0" />
+                        </StackPanel>
+                    </Grid>
+                    <ProgressBar Height="8" Minimum="0" Maximum="100" Margin="0,6,0,0"
+                                 Value="{Binding ProgressPercent, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" Style="{StaticResource StatCard}" Margin="0,16,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="引擎输出" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                    <TextBox Grid.Row="1"
+                             x:Name="LogBox"
+                             Text="{Binding LogText, Mode=OneWay}"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="NoWrap"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             FontFamily="Consolas, Microsoft YaHei UI"
+                             FontSize="12"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

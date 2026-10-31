@@ -1,0 +1,168 @@
+<Page x:Class="ClassManager.App.Views.SeatPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:controls="clr-namespace:ClassManager.App.Controls"
+      Title="座位管理">
+    <Page.InputBindings>
+        <KeyBinding Modifiers="Control" Key="O" Command="{Binding ImportCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding ClearSelectionCommand}" />
+    </Page.InputBindings>
+
+    <Grid x:Name="Root" Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左控制栏 -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,16,0">
+            <StackPanel>
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="座位控制" Style="{StaticResource SubtitleTextStyle}" Margin="0,0,0,12" />
+
+                        <ui:Button Content="导入成绩单"
+                                   Icon="{ui:SymbolIcon FolderOpen24}"
+                                   Command="{Binding ImportCommand}"
+                                   Appearance="Primary"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,10" />
+
+                        <TextBlock Text="座位布局设置" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="行数 (1-20)" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
+                            <ui:NumberBox Value="{Binding Rows, Mode=TwoWay}"
+                                          Minimum="1"
+                                          Maximum="20"
+                                          SmallChange="1"
+                                          SpinButtonPlacementMode="Compact"
+                                          HorizontalAlignment="Right"
+                                          Width="120" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="列数 (1-20)" Style="{StaticResource BodyTextStyle}" VerticalAlignment="Center" />
+                            <ui:NumberBox Value="{Binding Cols, Mode=TwoWay}"
+                                          Minimum="1"
+                                          Maximum="20"
+                                          SmallChange="1"
+                                          SpinButtonPlacementMode="Compact"
+                                          HorizontalAlignment="Right"
+                                          Width="120" />
+                        </Grid>
+
+                        <ui:Button Content="更新座位布局"
+                                   Icon="{ui:SymbolIcon ArrowSync24}"
+                                   Command="{Binding UpdateLayoutCommand}"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,4,0,6" />
+
+                        <ui:Button Content="间距设置"
+                                   Icon="{ui:SymbolIcon Settings24}"
+                                   Command="{Binding GapSettingsCommand}"
+                                   HorizontalAlignment="Stretch" />
+
+                        <ui:ToggleSwitch Content="显示分组表头与排标签"
+                                         IsChecked="{Binding ShowHeaders, Mode=TwoWay}"
+                                         Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="自动排座策略" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <ui:Button Content="按成绩蛇形排列"
+                                   Command="{Binding SnakeCommand}"
+                                   IsEnabled="{Binding HasData}"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,6" />
+                        <ui:Button Content="按成绩分组排列"
+                                   Command="{Binding GroupedCommand}"
+                                   IsEnabled="{Binding HasData}"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,6" />
+                        <ui:Button Content="随机排列"
+                                   Command="{Binding RandomCommand}"
+                                   IsEnabled="{Binding HasData}"
+                                   HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="手动调整" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <TextBlock Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="1. 点击顶部学生按钮选择学生&#x0a;2. 点击空座位放置学生&#x0a;3. 点击已占座位可清空" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="输出选项" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <ui:Button Content="学生名单"
+                                   Icon="{ui:SymbolIcon People24}"
+                                   Click="OnShowPaletteClick"
+                                   ToolTip="打开独立的名单侧栏，把名字拖到座位上安排"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,6" />
+                        <ui:Button Content="保存座位表"
+                                   Icon="{ui:SymbolIcon Save24}"
+                                   Command="{Binding SaveXlsxCommand}"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,6" />
+                        <ui:Button Content="导入座位表"
+                                   Icon="{ui:SymbolIcon ArrowImport24}"
+                                   Command="{Binding ImportSeatSheetCommand}"
+                                   ToolTip="仅支持本程序「保存座位表」导出的 xlsx，会按文件内的版式参数还原排版"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,6" />
+                        <ui:Button Content="打印座位表"
+                                   Icon="{ui:SymbolIcon Print24}"
+                                   Command="{Binding PrintCommand}"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,6" />
+                        <ui:Button Content="导出为图片"
+                                   Icon="{ui:SymbolIcon Image24}"
+                                   Command="{Binding ExportImageCommand}"
+                                   HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 右主显示区 -->
+        <Grid Grid.Column="1">
+            <!-- 空状态 -->
+            <Border Style="{StaticResource StatCard}"
+                    Visibility="{Binding HasData, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460">
+                    <TextBlock Text="🪑" Style="{StaticResource EmptyStateIconStyle}" />
+                    <TextBlock Text="还没有学生数据" Style="{StaticResource EmptyStateTitleStyle}" />
+                    <TextBlock Text="请先导入成绩单，然后使用自动排座或手动调整生成座位表。"
+                               Style="{StaticResource EmptyStateSubtitleStyle}" />
+                    <ui:Button Content="导入成绩单"
+                               Icon="{ui:SymbolIcon FolderOpen24}"
+                               Command="{Binding ImportCommand}"
+                               Appearance="Primary"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- 有数据 -->
+            <Grid Visibility="{Binding HasData, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <controls:SeatMapControl Grid.Row="0"
+                                         x:Name="SeatMap"
+                                         LayoutVersion="{Binding LayoutVersion}"
+                                         SelectedStudentName="{Binding SelectedStudentName}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>
