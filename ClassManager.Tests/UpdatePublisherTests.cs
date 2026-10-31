@@ -245,6 +245,17 @@ public class UpdatePublisherTests : IDisposable
     }
 
     [Fact]
+    public void Manifest_url_gets_a_cache_buster()
+    {
+        // jsDelivr / GitHub 对同一 URL 缓存很久，不破缓存的话发了新版用户还看到旧版本号
+        var withQuery = UpdateService.AddCacheBuster("https://cdn.jsdelivr.net/gh/a/b@main/docs/version.json");
+        Assert.Contains("cdn.jsdelivr.net/gh/a/b@main/docs/version.json?", withQuery, StringComparison.Ordinal);
+
+        var alreadyHasQuery = UpdateService.AddCacheBuster("https://example.com/v.json?x=1");
+        Assert.Contains("?x=1&", alreadyHasQuery, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Default_source_path_is_inside_user_profile()
     {
         // 默认更新源必须落在用户目录里，不能写到系统目录

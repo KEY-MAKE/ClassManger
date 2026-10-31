@@ -1,13 +1,13 @@
 {
-  "version": "0.30",
-  "url": "https://github.com/KEY-MAKE/ClassManager/releases/download/v0.30/ClassManager.App.exe",
-  "size": 82753583,
-  "sha256": "be3a4e61d92800688acd7ed509bf30067530f4366e5e6633653ad67e655b0436",
-  "notes": "v0.31：新增 GitHub Actions 自动发布 + 清单破缓存",
+  "version": "0.31",
+  "url": "https://github.com/KEY-MAKE/ClassManager/releases/download/v0.31/ClassManager.App.exe",
+  "size": 82754607,
+  "sha256": "7e4882e16bf2bbf603ccda0013492e2117817bd95cbfd2ea78f80d8550b157ba",
+  "notes": "v0.31：新增 GitHub Actions 自动发布、更新清单自动破缓存、GitHub 加速镜像自动回退",
   "publishedAt": "2026-10-31",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManager/releases/download/v0.30/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManager/releases/download/v0.30/ClassManager.App.exe"
+    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManager/releases/download/v0.31/ClassManager.App.exe",
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManager/releases/download/v0.31/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManager/releases/latest"
 }

@@ -654,7 +654,7 @@ public sealed class UpdateService : IUpdateService
     }
 
     /// <summary>给地址加一个时间戳参数，绕开 CDN 缓存。</summary>
-    internal static string AddCacheBuster(string url)
+    public static string AddCacheBuster(string url)
     {
         var separator = url.Contains('?') ? '&' : '?';
 
