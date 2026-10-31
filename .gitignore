@@ -14,6 +14,9 @@ _attachments/
 _conversations/
 _tools/
 
+# 临时调研脚本
+.tmp-*/
+
 # 打包中间物
 *.zip
 *.7z
