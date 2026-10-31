@@ -771,6 +771,13 @@ public sealed class InstallService : IInstallService
         var stem = Path.GetFileNameWithoutExtension(ExeName);
 
         // 2) 文件夹发布时的托管程序集与运行时配置（单文件发布时这些不存在）
+        //
+        // 只认**精确文件名**，不碰任何子目录。
+        // 曾经这里还有 "Assets" / "Resources" 目录白名单，结果用户在 Downloads 里
+        // 正好有同名目录（某个游戏的贴图，22 个文件），被整个复制进了安装目录 ——
+        // Windows 大小写不敏感，连 `resources` 和小写版都一起中招。
+        // 而本项目的 Resources 全部是 EmbeddedResource（编译进 dll/bundle），
+        // 根本不需要按目录复制。
         foreach (var candidate in new[] { stem + ".dll", stem + ".deps.json", stem + ".runtimeconfig.json" })
         {
             var path = Path.Combine(source, candidate);
@@ -778,26 +785,6 @@ public sealed class InstallService : IInstallService
             if (File.Exists(path))
             {
                 files.Add(path);
-            }
-        }
-
-        // 3) 资源目录（单文件发布时资源已嵌进 bundle，这里不存在）
-        foreach (var dirName in new[] { "Assets", "Resources" })
-        {
-            var dir = Path.Combine(source, dirName);
-
-            if (!Directory.Exists(dir))
-            {
-                continue;
-            }
-
-            try
-            {
-                files.AddRange(Directory.GetFiles(dir, "*", SearchOption.AllDirectories));
-            }
-            catch
-            {
-                // 目录读不到就跳过，绝不能因此卡住安装
             }
         }
 
