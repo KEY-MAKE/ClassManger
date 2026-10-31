@@ -21,6 +21,7 @@ docs/*.exe
 # 临时调研脚本
 .tmp-*/
 
-# 打包中间物
+# 打包中间物（但引擎载荷是必需资源，必须入库）
 *.zip
 *.7z
+!ClassManager.App/Assets/engine/*.zip
