@@ -39,11 +39,23 @@ public sealed class ToolInstaller
     public string NodeToolsDirectory => Path.Combine(ToolsDirectory, "node");
 
     /// <summary>
-    /// 可用的 Python 解释器（优先带 pip 的系统 Python）。
-    /// PATH 里常常没有 python.exe（官方安装器默认不加），所以还要翻标准安装目录。
+    /// 可用的 Python 解释器。
+    /// <para>
+    /// <b>优先用程序自带的嵌入式 Python</b>（课件引擎里那份）。
+    /// 老师们的电脑通常没装 Python —— 只查 PATH 的话，AI 办公的
+    /// <c>run_python</c> 在别人机器上直接不可用，而在开发机上一切正常。
+    /// </para>
+    /// <para>其次才是系统 Python（带 pip，能装包）。</para>
     /// </summary>
     public static string? FindPython()
     {
+        var bundled = FindBundledPython();
+
+        if (bundled is not null)
+        {
+            return bundled;
+        }
+
         foreach (var candidate in new[] { "python.exe", "python3.exe" })
         {
             var path = FindOnPath(candidate);
@@ -83,6 +95,41 @@ public sealed class ToolInstaller
         // 退到 py 启动器
         var launcher = Path.Combine(localAppData, "Programs", "Python", "Launcher", "py.exe");
         return File.Exists(launcher) ? launcher : null;
+    }
+
+    /// <summary>
+    /// 找程序自带的嵌入式 Python（课件引擎解压出来的 <c>runtime/python.exe</c>）。
+    /// <para>
+    /// 路径：<c>%LocalAppData%\ClassManager\engine\exam2ppt-*\runtime\python.exe</c>。
+    /// 引擎可能还没解压（用户没用过课件生成），这时返回 null，
+    /// 调用方可以触发 <c>Exam2PptService.EnsureEngineAsync</c> 来准备。
+    /// </para>
+    /// </summary>
+    public static string? FindBundledPython()
+    {
+        try
+        {
+            var root = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ClassManager",
+                "engine");
+
+            if (!Directory.Exists(root))
+            {
+                return null;
+            }
+
+            // 可能残留多个版本目录，取最新的那个
+            return Directory
+                .GetDirectories(root, "exam2ppt-*")
+                .OrderByDescending(d => d, StringComparer.OrdinalIgnoreCase)
+                .Select(d => Path.Combine(d, "runtime", "python.exe"))
+                .FirstOrDefault(File.Exists);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>可用的 Node。</summary>
@@ -262,6 +309,14 @@ public sealed class ToolInstaller
         if (python is null)
         {
             return "系统里找不到 Python，无法安装 Python 包。";
+        }
+
+        // 内置的嵌入式 Python 是裁剪版（没有 pip / ensurepip），装不了第三方包。
+        // 放在包名校验之后判断 —— 非法包名要优先被拦下来。
+        if (string.Equals(python, FindBundledPython(), StringComparison.OrdinalIgnoreCase))
+        {
+            return "当前使用的是程序内置的 Python（精简版，不含 pip），无法安装第三方包。"
+                   + "请改用标准库完成任务，或直接用 write_xlsx / write_docx / write_pptx 这些原生工具生成文件。";
         }
 
         Directory.CreateDirectory(PythonToolsDirectory);
