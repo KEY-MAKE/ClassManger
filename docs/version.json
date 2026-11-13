@@ -1,14 +1,14 @@
 {
-  "version": "0.46",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.46/ClassManager.App.exe",
-  "size": 82827349,
-  "sha256": "8dfccc26c02dc39f153a4177cdaeab900708b76e17e7a7ae63182c6b70da6390",
-  "notes": "fix(闪退): 更新失败不再崩进程——下载入口兜底 + 全局未处理异常捕获与日志",
+  "version": "0.47",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.47/ClassManager.App.exe",
+  "size": 82828373,
+  "sha256": "8373c92dae83eebb1b396314c416951622149e22855f156564873919dcd15719",
+  "notes": "fix(AI沙箱): 优先用程序自带的嵌入式 Python，老师电脑没装 Python 也能跑 run_python；Node 缺失时给模型明确降级提示",
   "publishedAt": "2026-11-13",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.46/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.46/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.46/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.47/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.47/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.47/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
