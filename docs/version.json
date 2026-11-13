@@ -1,14 +1,14 @@
 {
-  "version": "0.43",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.43/ClassManager.App.exe",
-  "size": 82825301,
-  "sha256": "c47952c19949b43e521410a629b3b076a0334a7716a910b505b0a91d76f9dcd7",
-  "notes": "fix(更新): 下载移到应用级后台管理器——关掉关于窗口继续下载，重开可见进度",
+  "version": "0.44",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe",
+  "size": 82824277,
+  "sha256": "4c384ff62096e3188d94116b488999cdc81f9e1d7e388345a4c6fcf686aa6f6e",
+  "notes": "feat(更新): 更新源内置且不可更改；清单改为镜像优先（省掉每次白等连接超时）",
   "publishedAt": "2026-11-13",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.43/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.43/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.43/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
