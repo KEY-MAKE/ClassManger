@@ -40,6 +40,12 @@ public static class AppServices
     /// <summary>检查更新（更新源 + 下载 + 交给新包覆盖安装）。</summary>
     public static IUpdateService Update { get; private set; } = null!;
 
+    /// <summary>
+    /// 更新下载的后台管理者（应用级）。
+    /// 下载不绑在「关于」窗口上 —— 窗口关了要继续下，重新打开要能看到进度。
+    /// </summary>
+    public static UpdateDownloadManager UpdateDownload { get; private set; } = null!;
+
     public static NavigationPageProvider PageProvider { get; private set; } = null!;
 
     /// <summary>是否已完成装配。</summary>
@@ -78,6 +84,7 @@ public static class AppServices
         Ai = new AiChatService();
         AiStore = new AiStore();
         Update = new UpdateService();
+        UpdateDownload = new UpdateDownloadManager(Update);
         PageProvider = new NavigationPageProvider();
 
         IsInitialized = true;

@@ -16,6 +16,7 @@ public sealed partial class AboutViewModel : ObservableObject
     private readonly ISettingsService _settings;
     private readonly IInstallService _install;
     private readonly IUpdateService _update;
+    private readonly UpdateDownloadManager _download;
 
     private Window? _owner;
     private UpdateManifest? _pendingUpdate;
@@ -25,6 +26,12 @@ public sealed partial class AboutViewModel : ObservableObject
         _settings = settings;
         _install = install;
         _update = update;
+        _download = AppServices.UpdateDownload;
+
+        // 下载跑在应用级单例里，窗口关掉也不会停；这里接上它当前的状态，
+        // 所以重新打开「关于」能直接看到进度。
+        _download.Changed += OnDownloadChanged;
+        SyncDownloadState();
 
         var last = update.Settings.LastCheckedText ?? string.Empty;
         UpdateStatusText = last.Length > 0
@@ -36,6 +43,34 @@ public sealed partial class AboutViewModel : ObservableObject
 
     /// <summary>由窗口代码后置注入，用于给子窗口指定 Owner。</summary>
     public void AttachOwner(Window owner) => _owner = owner;
+
+    /// <summary>窗口关闭时调用：退订，避免已销毁的 ViewModel 继续被回调。</summary>
+    public void Detach() => _download.Changed -= OnDownloadChanged;
+
+    /// <summary>后台下载状态变化 → 切回 UI 线程刷新。</summary>
+    private void OnDownloadChanged(object? sender, EventArgs e)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+
+        if (dispatcher is null || dispatcher.HasShutdownStarted)
+        {
+            return;
+        }
+
+        dispatcher.BeginInvoke(new Action(SyncDownloadState));
+    }
+
+    /// <summary>把后台下载状态映射到界面属性。</summary>
+    private void SyncDownloadState()
+    {
+        IsDownloading = _download.IsDownloading;
+        DownloadPercent = _download.Percent;
+
+        if (_download.State is UpdateDownloadManager.DownloadState.Failed)
+        {
+            UpdateStatusText = "✗ " + _download.Message;
+        }
+    }
 
     public AuthorInfo Author => _settings.Current.Author;
 
@@ -146,7 +181,9 @@ public sealed partial class AboutViewModel : ObservableObject
     private async Task DownloadUpdate()
     {
         var info = _pendingUpdate;
-        if (info is null || IsDownloading)
+
+        // 已经在后台下载同一个版本 → 不重复确认、不重复启动
+        if (info is null || _download.IsDownloading)
         {
             return;
         }
@@ -166,28 +203,13 @@ public sealed partial class AboutViewModel : ObservableObject
             return;
         }
 
+        // 下载交给应用级管理器：窗口关掉也继续下，完成后再启动新包安装。
+        // 不在这里 await —— 这里 await 会让进度回调绑死在当前窗口的 UI 上下文中，
+        // 窗口一关就抛异常把下载打断（就是之前的「关窗口 → 下载失败」）。
+        _download.Start(info);
+
         IsDownloading = true;
         DownloadPercent = 0;
-
-        var progress = new Progress<int>(value => DownloadPercent = value);
-        var result = await _update.DownloadAsync(info, progress);
-
-        IsDownloading = false;
-
-        if (!result.Ok)
-        {
-            await ShowMessageAsync("更新失败", result.Message);
-            return;
-        }
-
-        if (!_update.Launch(result.FilePath))
-        {
-            await ShowMessageAsync("更新失败", "无法启动安装包：" + result.FilePath);
-            return;
-        }
-
-        // 交给新包接管：它会自动覆盖安装旧版本
-        Application.Current?.Shutdown();
     }
 
     /// <summary>
