@@ -15,6 +15,10 @@ public partial class AboutWindow : FluentWindow
         var viewModel = new AboutViewModel(settings, install, update);
         DataContext = viewModel;
         viewModel.AttachOwner(this);
+
+        // 窗口关掉就退订 —— 下载在应用级管理器里继续跑，
+        // 但这个 ViewModel 已经没用了，不该再被回调。
+        Closed += (_, _) => viewModel.Detach();
     }
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
