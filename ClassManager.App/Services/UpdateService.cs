@@ -68,6 +68,11 @@ public sealed class UpdateService : IUpdateService
         _store = new UpdateSettingsStore(baseDirectory);
         _settings = _store.Load();
 
+        // 更新源固定内置：无论 settings.json 里存过什么都不算数。
+        // 放在构造里覆盖（而不是在 CheckAsync 里写死常量），
+        // 这样测试仍然可以把自己需要的源注入进来。
+        _settings.SourceUrl = BuiltinSourceUrl;
+
         DownloadsDirectory = string.IsNullOrWhiteSpace(downloadsDirectory)
             ? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -84,7 +89,10 @@ public sealed class UpdateService : IUpdateService
 
     public async Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
     {
+        // 源在构造函数里已被强制设成内置值（见 BuiltinSourceUrl），
+        // 这里照常读 settings —— 生产环境改不了，测试可以注入。
         var source = _settings.SourceUrl?.Trim() ?? string.Empty;
+
         if (source.Length == 0)
         {
             return UpdateCheckResult.NoConfig();
@@ -677,6 +685,16 @@ public sealed class UpdateService : IUpdateService
         return 0;
     }
 
+    /// <summary>
+    /// 内置更新源（用户不可更改）。
+    /// <para>
+    /// 填 GitHub 的原始地址，由 <see cref="BuildManifestCandidates"/> 优先走加速镜像 ——
+    /// 直接把镜像地址写死的话，镜像挂了就没法自动切换了。
+    /// </para>
+    /// </summary>
+    public const string BuiltinSourceUrl =
+        "https://github.com/KEY-MAKE/ClassManger/releases/latest/download/version.json";
+
     /// <summary>清单地址的加速前缀。清单只有几百字节，镜像都扛得住。</summary>
     private static readonly string[] ManifestMirrors =
     {
@@ -696,15 +714,15 @@ public sealed class UpdateService : IUpdateService
         // 清单地址本身也可能连不上：GitHub 的 releases/latest/download 会 302 到
         // objects.githubusercontent.com，国内经常直接挂。连不上就查不到更新，
         // 「检查更新」按钮等于废的 —— 所以这里必须多源重试。
-        var candidates = BuildManifestCandidates(source).ToList();
+        var candidates = BuildManifestCandidates(source);
         var errors = new List<string>();
 
-        for (var i = 0; i < candidates.Count; i++)
+        foreach (var (candidate, bustCache) in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             // 只给原始地址破缓存：镜像地址带 query 可能被它自己的路由解析错
-            var url = i == 0 ? AddCacheBuster(candidates[i]) : candidates[i];
+            var url = bustCache ? AddCacheBuster(candidate) : candidate;
 
             try
             {
@@ -732,29 +750,43 @@ public sealed class UpdateService : IUpdateService
             "所有更新源都读取失败：" + string.Join("；", errors.Take(3)));
     }
 
-    /// <summary>按「原始 → 加速前缀 → jsDelivr 兜底」的顺序列出清单候选地址。</summary>
-    private static IEnumerable<string> BuildManifestCandidates(string source)
+    /// <summary>
+    /// 按「加速镜像 → 原始地址 → jsDelivr 兜底」的顺序列出清单候选。
+    /// <para>
+    /// 镜像排前面：国内直连 GitHub 的 <c>releases/latest/download</c> 基本必挂，
+    /// 放第一个的话每次检查更新都要先白等一次连接超时。
+    /// </para>
+    /// </summary>
+    private static List<(string Url, bool BustCache)> BuildManifestCandidates(string source)
     {
-        yield return source;
+        var candidates = new List<(string Url, bool BustCache)>();
 
         if (!source.Contains("github.com/", StringComparison.OrdinalIgnoreCase))
         {
-            yield break;
+            // 本地文件 / 自定义源：直接用
+            candidates.Add((source, false));
+            return candidates;
         }
 
+        // 1) 加速镜像优先
         foreach (var prefix in ManifestMirrors)
         {
-            yield return prefix + source;
+            candidates.Add((prefix + source, false));
         }
 
-        // 最后兜底：jsDelivr 读仓库里的 docs/version.json（Actions 每次发版都会提交回去）。
-        // 它有缓存延迟，所以只放在最后 —— 万一返回旧版本，最多是「没发现更新」，不会误下载。
+        // 2) 原始地址兜底（给它加时间戳破缓存）
+        candidates.Add((source, true));
+
+        // 3) jsDelivr：读仓库里的 docs/version.json（Actions 每次发版都会提交回去）。
+        //    有缓存延迟，所以放最后 —— 万一返回旧版本，最多是「没发现更新」，不会误下载。
         var repo = TryParseGitHubRepo(source);
 
         if (repo is not null)
         {
-            yield return $"https://cdn.jsdelivr.net/gh/{repo}@main/docs/version.json";
+            candidates.Add(($"https://cdn.jsdelivr.net/gh/{repo}@main/docs/version.json", false));
         }
+
+        return candidates;
     }
 
     /// <summary>从 github.com 链接里取出 owner/repo。</summary>

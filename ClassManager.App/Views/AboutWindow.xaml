@@ -43,11 +43,7 @@
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <ui:Button Content="检查更新"
                                        Icon="{ui:SymbolIcon ArrowSync24}"
-                                       Command="{Binding CheckUpdateCommand}"
-                                       Margin="0,0,8,0" />
-                            <ui:Button Content="更新源设置"
-                                       Icon="{ui:SymbolIcon Settings24}"
-                                       Command="{Binding ConfigureUpdateSourceCommand}" />
+                                       Command="{Binding CheckUpdateCommand}" />
                         </StackPanel>
 
                         <TextBlock Text="{Binding UpdateStatusText}"

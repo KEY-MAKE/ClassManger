@@ -76,16 +76,26 @@ public class UpdateServiceTests
         Assert.Equal(expectedSign, Math.Sign(actual));
     }
 
+    /// <summary>
+    /// 更新源现在固定内置：即使 settings.json 里存过别的地址（哪怕是空），
+    /// 构造完也必须被覆盖成内置值 —— 用户改不了。
+    /// </summary>
     [Fact]
-    public async Task CheckAsync_未配置更新源_返回NotConfigured()
+    public void 构造后更新源被强制设为内置值()
     {
         using var temp = new TempDirectory();
+
+        // 先写一份「用户自定义」的设置
+        var store = new UpdateSettingsStore(temp.Path);
+        var settings = store.Load();
+        settings.SourceUrl = "https://user-custom.invalid/version.json";
+        store.Save(settings);
+
+        // 新建服务 → 必须无视上面的值
         var service = new UpdateService(temp.Path, Path.Combine(temp.Path, "updates"));
 
-        var result = await service.CheckAsync();
-
-        Assert.True(result.NotConfigured);
-        Assert.False(result.HasUpdate);
+        Assert.Equal(UpdateService.BuiltinSourceUrl, service.Settings.SourceUrl);
+        Assert.NotEqual("https://user-custom.invalid/version.json", service.Settings.SourceUrl);
     }
 
     [Fact]
