@@ -479,6 +479,22 @@ public sealed class AiFileTools
             return "code 不能为空。";
         }
 
+        // 内置 Python 在课件引擎里，用户没用过「试卷转课件」时还没解压。
+        // 这里顺手把它准备出来（首次约几秒），否则老师们的电脑上
+        // （没装 Python）会直接报「找不到解释器」。
+        if (ToolInstaller.FindPython() is null)
+        {
+            var engine = AppServices.Exam2Ppt;
+            var ready = await engine.EnsureEngineAsync(null, ct).ConfigureAwait(false);
+
+            if (!ready)
+            {
+                return "当前电脑没有可用的 Python 运行环境，且内置运行时准备失败："
+                       + (engine.LastEngineError ?? "未知原因")
+                       + "\n请改用不依赖 Python 的方式完成任务（比如直接用写文件工具生成结果）。";
+            }
+        }
+
         return await CreateInstaller().RunPythonAsync(code, ct).ConfigureAwait(false);
     }
 
@@ -488,6 +504,15 @@ public sealed class AiFileTools
         if (string.IsNullOrWhiteSpace(code))
         {
             return "code 不能为空。";
+        }
+
+        // 程序只自带 Python，不带 Node（node.exe 约 80MB，为体积考虑没打包）。
+        // 明确告诉模型「这条路走不通」，让它改用 Python 或直接写文件，
+        // 而不是让它反复重试或给用户报一个看不懂的错误。
+        if (ToolInstaller.FindNode() is null)
+        {
+            return "本机没有 Node.js 运行环境（程序只自带 Python，不含 Node）。"
+                   + "请改用 run_python，或者直接用写文件工具生成结果文件。";
         }
 
         return await CreateInstaller().RunNodeAsync(code, ct).ConfigureAwait(false);
