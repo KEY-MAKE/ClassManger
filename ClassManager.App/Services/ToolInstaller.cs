@@ -297,6 +297,21 @@ public sealed class ToolInstaller
         }
     }
 
+    /// <summary>pip 首选镜像（清华 TUNA）—— 国内速度最快的源之一。</summary>
+    private const string PipMirrorUrl = "https://pypi.tuna.tsinghua.edu.cn/simple";
+
+    /// <summary>清华源的 host（--trusted-host 需要）。</summary>
+    private const string PipMirrorHost = "pypi.tuna.tsinghua.edu.cn";
+
+    /// <summary>pip 备用镜像（阿里云）。</summary>
+    private const string PipFallbackMirrorUrl = "https://mirrors.aliyun.com/pypi/simple/";
+
+    /// <summary>阿里云源 host。</summary>
+    private const string PipFallbackMirrorHost = "mirrors.aliyun.com";
+
+    /// <summary>npm 镜像（npmmirror，原淘宝源）。</summary>
+    private const string NpmRegistry = "https://registry.npmmirror.com";
+
     /// <summary>安装 Python 包到工作区（pip install --target，不污染系统）。</summary>
     public async Task<string> InstallPythonPackageAsync(string package, CancellationToken ct)
     {
@@ -363,6 +378,14 @@ public sealed class ToolInstaller
         startInfo.ArgumentList.Add("install");
         startInfo.ArgumentList.Add("--disable-pip-version-check");
         startInfo.ArgumentList.Add("--no-input");
+
+        // 直接用国内镜像：官方 PyPI 在国内经常几十 KB/s 甚至超时，
+        // 装个 pypdf 能等好几分钟。清华源实测几秒到十几秒。
+        startInfo.ArgumentList.Add("--index-url");
+        startInfo.ArgumentList.Add(PipMirrorUrl);
+        startInfo.ArgumentList.Add("--trusted-host");
+        startInfo.ArgumentList.Add(PipMirrorHost);
+
         startInfo.ArgumentList.Add("--target");
         startInfo.ArgumentList.Add(PythonToolsDirectory);
         startInfo.ArgumentList.Add(package);
@@ -401,8 +424,11 @@ public sealed class ToolInstaller
         retry.ArgumentList.Add("install");
         retry.ArgumentList.Add("--disable-pip-version-check");
         retry.ArgumentList.Add("--no-input");
+        // 备用源：阿里云。清华抽风时换它，仍然留在国内。
         retry.ArgumentList.Add("--index-url");
-        retry.ArgumentList.Add("https://pypi.org/simple");
+        retry.ArgumentList.Add(PipFallbackMirrorUrl);
+        retry.ArgumentList.Add("--trusted-host");
+        retry.ArgumentList.Add(PipFallbackMirrorHost);
         retry.ArgumentList.Add("--target");
         retry.ArgumentList.Add(PythonToolsDirectory);
         retry.ArgumentList.Add(package);
@@ -440,6 +466,11 @@ public sealed class ToolInstaller
         startInfo.ArgumentList.Add("install");
         startInfo.ArgumentList.Add("--no-audit");
         startInfo.ArgumentList.Add("--no-fund");
+
+        // 走国内镜像（npmmirror，原淘宝源）。官方 registry 在国内经常卡住。
+        startInfo.ArgumentList.Add("--registry");
+        startInfo.ArgumentList.Add(NpmRegistry);
+
         startInfo.ArgumentList.Add("--prefix");
         startInfo.ArgumentList.Add(NodeToolsDirectory);
         startInfo.ArgumentList.Add(package);

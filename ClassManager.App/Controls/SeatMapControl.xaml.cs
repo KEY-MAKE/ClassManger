@@ -55,18 +55,85 @@ public partial class SeatMapControl : UserControl
     {
         InitializeComponent();
 
-        // 画布白底统一取自 SeatMapPalette（单一来源），避免 XAML 与代码两处定义。
-        var canvasBackground = new SolidColorBrush(SeatMapPalette.CanvasBackground);
-        Paper.Background = canvasBackground;
-        Surface.Background = canvasBackground;
+        // 屏幕上的画布底色跟随主题：深色模式下用深灰，浅色模式下用原来的白。
+        //
+        // 注意：这里的底色**只影响屏幕显示**。导出图片 / 打印走的是
+        // ExportService.BuildSeatSheet（独立绘制，用自己的白底），
+        // 所以打印出来仍然是白纸黑字，不受主题影响。
+        ApplyCanvasBackground();
 
         // 接收「学生名单」窗口拖过来的名字
         AllowDrop = true;
         DragOver += OnDragOverSeat;
         Drop += OnDropSeat;
 
-        Loaded += (_, _) => Redraw();
+        Loaded += (_, _) =>
+        {
+            ApplyCanvasBackground();
+            SubscribeTheme();
+            Redraw();
+        };
+
+        Unloaded += (_, _) => UnsubscribeTheme();
     }
+
+    /// <summary>把画布底色刷成当前主题对应的颜色。</summary>
+    private void ApplyCanvasBackground()
+    {
+        var brush = new SolidColorBrush(CurrentCanvasColor());
+        Paper.Background = brush;
+        Surface.Background = brush;
+    }
+
+    /// <summary>当前主题下画布该用的底色。</summary>
+    private static Color CurrentCanvasColor()
+    {
+        try
+        {
+            var preference = AppServices.Theme.Preference;
+
+            var dark = preference == ThemePreference.Dark
+                       || (preference == ThemePreference.System
+                           && Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme()
+                              == Wpf.Ui.Appearance.ApplicationTheme.Dark);
+
+            return dark
+                ? Color.FromRgb(0x1B, 0x1B, 0x1F)
+                : SeatMapPalette.CanvasBackground;
+        }
+        catch
+        {
+            // 服务还没初始化（设计器 / 早期构造）→ 回退白底
+            return SeatMapPalette.CanvasBackground;
+        }
+    }
+
+    private void SubscribeTheme()
+    {
+        try
+        {
+            AppServices.Theme.Changed -= OnThemeChanged;
+            AppServices.Theme.Changed += OnThemeChanged;
+        }
+        catch
+        {
+            // 忽略
+        }
+    }
+
+    private void UnsubscribeTheme()
+    {
+        try
+        {
+            AppServices.Theme.Changed -= OnThemeChanged;
+        }
+        catch
+        {
+            // 忽略
+        }
+    }
+
+    private void OnThemeChanged(object? sender, ThemePreference preference) => ApplyCanvasBackground();
 
     /// <summary>布局版本号：自增触发重绘。</summary>
     public static readonly DependencyProperty LayoutVersionProperty =

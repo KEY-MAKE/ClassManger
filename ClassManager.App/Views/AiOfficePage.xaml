@@ -55,6 +55,7 @@
                 <ListBox Grid.Row="1"
                          ItemsSource="{Binding Conversations}"
                          SelectedItem="{Binding SelectedConversation}"
+                         IsEnabled="{Binding CanSwitchConversation}"
                          BorderThickness="0"
                          Background="Transparent"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">

@@ -178,6 +178,15 @@ public sealed class AiSettings
     /// <summary>权限模式。</summary>
     public AiPermissionMode PermissionMode { get; set; } = AiPermissionMode.WorkspaceOnly;
 
+    /// <summary>
+    /// 上次选中的对话 Id。
+    /// <para>
+    /// 少了它就会出现「新建对话 → 切走 → 回来跳到旧对话」：
+    /// 每次进页面都重新构造 ViewModel，只能盲选列表第一个。
+    /// </para>
+    /// </summary>
+    public string LastConversationId { get; set; } = string.Empty;
+
     /// <summary>默认工作区（文档目录下的子文件夹）。</summary>
     public static string DefaultWorkspace => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),

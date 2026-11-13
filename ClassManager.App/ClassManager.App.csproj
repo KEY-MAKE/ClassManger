@@ -9,13 +9,13 @@
     <LangVersion>latest</LangVersion>
     <ApplicationIcon>Assets\Class.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.47</Version>
+    <Version>0.48</Version>
 
     <!-- 关键：默认会把 git commit hash 追加到 InformationalVersion（变成 "0.31+abc123…"），
          那会破坏版本号比较（更新检查直接失效）。必须关掉。 -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AssemblyVersion>0.47.0.0</AssemblyVersion>
-    <FileVersion>0.47.0.0</FileVersion>
+    <AssemblyVersion>0.48.0.0</AssemblyVersion>
+    <FileVersion>0.48.0.0</FileVersion>
     <AssemblyTitle>班级综合管理系统</AssemblyTitle>
     <Product>班级综合管理系统</Product>
     <Company>K.</Company>
@@ -40,6 +40,9 @@
     <EmbeddedResource Include="Assets\engine\exam2ppt-payload.zip" />
     <!-- AI 办公的内置凭据（OpenAI 兼容端点 + 模型 + 多把 key），运行期从程序集读取。 -->
     <EmbeddedResource Include="Assets\ai\credentials.json" />
+
+    <!-- 试卷格式规范：内置一份，AI 办公时释放到工作区供 read_file 读取 -->
+    <EmbeddedResource Include="Assets\ai\exam-spec.md" />
   </ItemGroup>
 
   <ItemGroup>
