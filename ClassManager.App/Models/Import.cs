@@ -9,7 +9,9 @@ public sealed record ImportResult(
     string? ScoreColumn,
     bool UsedFallbackNameColumn,
     bool GeneratedDemoScores,
-    string? NameColumnNotice);
+    string? NameColumnNotice,
+    int SkippedHiddenRows = 0,
+    string? FilterNotice = null);
 
 /// <summary>导入过程中的可读异常（UI 直接展示 Message）。</summary>
 public sealed class ImportException : Exception
