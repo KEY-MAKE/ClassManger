@@ -27,6 +27,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        InstallCrashGuards();
+
         // 0) `--import <文件>` 需进入 UI（导入后停在主界面），不属于「处理完即退出」的命令
         _importOnStart = ResolveImportPath(e.Args);
 
@@ -196,6 +198,101 @@ public partial class App : Application
                 AppServices.WindowActivation.BringToFront(_mainWindow);
             }
         });
+    }
+
+    /// <summary>
+    /// 兜底：任何未捕获异常都不许让程序静默消失。
+    /// <para>
+    /// 真实反馈：0.39 里点「立即更新」下载超时，异常从
+    /// <c>AsyncRelayCommand</c> 逃出来，进程直接崩 —— 用户看到的是
+    /// 「进度条卡 0% 然后闪退」，连一句错误提示都没有。
+    /// </para>
+    /// <para>
+    /// 这里把 UI 线程异常拦下来弹提示，并记录到日志；后台任务异常只记日志。
+    /// 更新功能本身已经各自 try/catch，这里只是最后一道网。
+    /// </para>
+    /// </summary>
+    private void InstallCrashGuards()
+    {
+        DispatcherUnhandledException += (_, args) =>
+        {
+            try
+            {
+                AppendCrashLog("UI", args.Exception);
+            }
+            catch
+            {
+                // 日志都写不了就算了
+            }
+
+            try
+            {
+                MessageBox.Show(
+                    "程序遇到一个未处理的错误，已记录到日志。\n\n"
+                    + args.Exception.Message
+                    + "\n\n可以继续使用，若反复出现请把 install.log 发给我。",
+                    "班级综合管理系统",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch
+            {
+                // 弹不出提示也不能再崩一次
+            }
+
+            // 吃掉这次异常，别让进程退出
+            args.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            try
+            {
+                AppendCrashLog("AppDomain", args.ExceptionObject as Exception);
+            }
+            catch
+            {
+                // 忽略
+            }
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            try
+            {
+                AppendCrashLog("Task", args.Exception);
+            }
+            catch
+            {
+                // 忽略
+            }
+
+            args.SetObserved();
+        };
+    }
+
+    /// <summary>把崩溃信息写到 install.log 同目录，方便事后排查。</summary>
+    private static void AppendCrashLog(string source, Exception? ex)
+    {
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "ClassManager");
+
+            Directory.CreateDirectory(dir);
+
+            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [崩溃/{source}] {ex?.GetType().Name}: {ex?.Message}"
+                       + Environment.NewLine
+                       + ex?.StackTrace
+                       + Environment.NewLine;
+
+            File.AppendAllText(Path.Combine(dir, "crash.log"), line);
+        }
+        catch
+        {
+            // 忽略
+        }
     }
 
     /// <summary>处理命令行参数；返回 true 表示已处理并应直接退出。</summary>
