@@ -318,7 +318,9 @@ public sealed class InstallService : IInstallService
                 $"复制后未在安装目录找到可执行文件：{exePath}\n请检查是否有安全软件拦截了文件写入。");
         }
 
-        var expected = new FileInfo(Path.Combine(source, ExeName)).Length;
+        var sourceExe = FindMainExecutable(source)
+                        ?? throw new InvalidOperationException($"在 {source} 里找不到主程序，无法校验。");
+        var expected = new FileInfo(sourceExe).Length;
         var actual = new FileInfo(exePath).Length;
         if (expected != actual)
         {
@@ -594,7 +596,16 @@ public sealed class InstallService : IInstallService
             CopyProgramFiles(currentDir, installDir);
 
             var exePath = Path.Combine(installDir, ExeName);
-            var expected = new FileInfo(Path.Combine(currentDir, ExeName)).Length;
+            var sourceExePath = FindMainExecutable(currentDir);
+
+            if (sourceExePath is null)
+            {
+                message = $"修复失败：在 {currentDir} 里找不到主程序";
+                AppendLog(message);
+                return false;
+            }
+
+            var expected = new FileInfo(sourceExePath).Length;
 
             if (!File.Exists(exePath))
             {
@@ -796,6 +807,48 @@ public sealed class InstallService : IInstallService
     }
 
     /// <summary>
+    /// 在目录里找出本程序的主 exe。
+    /// <para>
+    /// 优先标准名 <c>ClassManager.App.exe</c>；找不到就退而求其次接受
+    /// <c>ClassManager.App-0.44.exe</c> 这种带版本号的名字 ——
+    /// 那是「应用内更新」下载下来的文件名。
+    /// </para>
+    /// <para>
+    /// 这里踩过坑：下载侧把文件存成带版本号的名字，安装侧却只认标准名，
+    /// 结果每次「更新完重启还是旧版」—— 覆盖安装一直报
+    /// 「在 updates 里找不到 ClassManager.App.exe」。
+    /// </para>
+    /// </summary>
+    private static string? FindMainExecutable(string dir)
+    {
+        try
+        {
+            var standard = Path.Combine(dir, ExeName);
+
+            if (File.Exists(standard))
+            {
+                return standard;
+            }
+
+            if (!Directory.Exists(dir))
+            {
+                return null;
+            }
+
+            // 带版本号的下载产物：取最新那个
+            return Directory
+                .EnumerateFiles(dir, "ClassManager.App*.exe", SearchOption.TopDirectoryOnly)
+                .Where(f => !f.EndsWith(".part", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(f => new FileInfo(f).LastWriteTimeUtc)
+                .FirstOrDefault();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// 挑出属于「本程序」的文件 —— 安装时**只**复制这些。
     /// <para>
     /// 历史故障（用户实测截图）：安装向导把来源目录里的**所有**文件都复制过去。
@@ -817,10 +870,10 @@ public sealed class InstallService : IInstallService
             return files;
         }
 
-        // 1) 主程序 exe —— 必须有
-        var exe = Path.Combine(source, ExeName);
+        // 1) 主程序 exe —— 必须有（兼容带版本号的下载文件名）
+        var exe = FindMainExecutable(source);
 
-        if (File.Exists(exe))
+        if (exe is not null)
         {
             files.Add(exe);
         }
@@ -865,14 +918,23 @@ public sealed class InstallService : IInstallService
             throw new InvalidOperationException($"在 {source} 里找不到 {ExeName}，无法安装。");
         }
 
+        var mainExe = FindMainExecutable(source);
         var copied = 0;
         var skipped = 0;
 
         for (var i = 0; i < files.Count; i++)
         {
             var file = files[i];
-            var relative = Path.GetRelativePath(source, file);
-            var destination = Path.Combine(target, relative);
+            var isMainProgram = mainExe is not null
+                                && string.Equals(file, mainExe, StringComparison.OrdinalIgnoreCase);
+
+            // 主程序在安装目录里必须叫标准名：更新下载的是
+            // ClassManager.App-0.44.exe，不改名的话装进去的 exe 名字不对，
+            // 下次启动找不到主程序（表现为「更新完还是旧版」）。
+            var destination = isMainProgram
+                ? Path.Combine(target, ExeName)
+                : Path.Combine(target, Path.GetRelativePath(source, file));
+
             var destinationDir = Path.GetDirectoryName(destination);
 
             progress?.Report($"正在复制程序文件…({i + 1}/{files.Count})");
@@ -889,8 +951,6 @@ public sealed class InstallService : IInstallService
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                var isMainProgram = string.Equals(file, Path.Combine(source, ExeName), StringComparison.OrdinalIgnoreCase);
-
                 if (isMainProgram)
                 {
                     throw new InvalidOperationException(
@@ -899,7 +959,7 @@ public sealed class InstallService : IInstallService
                 }
 
                 skipped++;
-                AppendLog($"安装：跳过被占用的文件 {relative}（{ex.GetType().Name}）");
+                AppendLog($"安装：跳过被占用的文件 {Path.GetFileName(file)}（{ex.GetType().Name}）");
             }
         }
 
