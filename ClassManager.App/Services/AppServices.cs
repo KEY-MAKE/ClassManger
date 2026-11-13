@@ -92,6 +92,9 @@ public static class AppServices
         RollCall.LoadRoster(result.Students);
         Seating.LoadRoster(result.Students);
 
+        // 落盘一份，下次启动直接可用（导入和启动恢复都会走这里，内容一致，重复保存无害）
+        RosterStore.Save(result);
+
         RosterImported?.Invoke(null, result);
     }
 }

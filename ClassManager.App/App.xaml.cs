@@ -171,6 +171,9 @@ public partial class App : Application
             _ = viewModel.ImportRosterFromPathAsync(importPath);
         }
 
+        // 恢复上次导入的名单（用户不做任何操作就能直接点名）
+        _ = viewModel.RestoreLastRosterAsync();
+
         // 启动时静默检查更新（可在「关于 → 更新源设置」里关闭）
         _ = viewModel.CheckUpdateOnStartupAsync();
     }

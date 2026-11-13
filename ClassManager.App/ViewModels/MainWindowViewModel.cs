@@ -182,6 +182,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IShell
             ShowToast("导入成功", $"成功导入 {result.Students.Count} 名学生，已按成绩排序", ControlAppearance.Success);
 
             var notice = new List<string>();
+
+            // 筛选隐藏行：说清楚为什么人数比表里少，否则老师会以为丢人了
+            if (result.SkippedHiddenRows > 0)
+            {
+                notice.Add($"表格里有 {result.SkippedHiddenRows} 行被筛选隐藏，已自动跳过，只导入可见的 {result.Students.Count} 人。");
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.FilterNotice))
+            {
+                notice.Add(result.FilterNotice!);
+            }
+
             if (!string.IsNullOrWhiteSpace(result.NameColumnNotice))
             {
                 notice.Add(result.NameColumnNotice!);
@@ -207,6 +219,35 @@ public sealed partial class MainWindowViewModel : ObservableObject, IShell
             await ShowMessageAsync("导入失败", $"读取文件时出错: {ex.Message}");
             SetStatus($"导入失败: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 启动时恢复上次导入的名单，省掉每次开机重新选文件。
+    /// <para>
+    /// 必须在主窗口 Show() 之后调用 —— 点名页 / 座位页要先把
+    /// <see cref="AppServices.RosterImported"/> 订阅上，否则数据推不过去。
+    /// </para>
+    /// </summary>
+    public Task RestoreLastRosterAsync()
+    {
+        var restored = RosterStore.TryLoad();
+
+        if (restored is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        AppServices.ApplyRoster(restored);
+
+        ClassName = $"班级: {restored.ClassName} | 人数: {restored.Students.Count}";
+        SetStatus($"已恢复上次名单: {restored.ClassName}，共 {restored.Students.Count} 名学生");
+
+        ShowToast(
+            "已恢复上次名单",
+            $"{restored.ClassName} · {restored.Students.Count} 人（可直接点名）",
+            ControlAppearance.Success);
+
+        return Task.CompletedTask;
     }
 
     [RelayCommand]

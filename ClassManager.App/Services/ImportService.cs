@@ -45,8 +45,48 @@ public sealed class ImportService : IImportService
         try
         {
             var rows = ReadRows(filePath);
+
+            // 老师在全校表里用「筛选」抽出本班时，被筛掉的行只是 hidden，数据仍在。
+            // 不处理的话导入的是全校名单 —— 所以先拿行可见性，再把隐藏行剔掉。
+            var skipped = 0;
+            string? filterNotice = null;
+
+            if (string.Equals(Path.GetExtension(filePath), ".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                var layout = XlsxRowFilter.Analyze(filePath);
+
+                if (layout is { HiddenCount: > 0 })
+                {
+                    if (layout.DataRows.Count == rows.Count)
+                    {
+                        var visible = new List<IDictionary<string, object?>>(rows.Count);
+
+                        for (var i = 0; i < rows.Count; i++)
+                        {
+                            if (layout.DataRows[i].Hidden)
+                            {
+                                skipped++;
+                            }
+                            else
+                            {
+                                visible.Add(rows[i]);
+                            }
+                        }
+
+                        rows = visible;
+                    }
+                    else
+                    {
+                        filterNotice =
+                            $"检测到 {layout.HiddenCount} 行被筛选隐藏，但表格行数（{layout.DataRows.Count}）"
+                            + $"与读到的数据行数（{rows.Count}）对不上，无法自动剔除。\n"
+                            + "建议：在 Excel 里把筛选结果复制到新表后再导入。";
+                    }
+                }
+            }
+
             var result = ImportFromRows(rows, className, generateDemoScoresWhenMissing);
-            return result with { FilePath = filePath };
+            return result with { FilePath = filePath, SkippedHiddenRows = skipped, FilterNotice = filterNotice };
         }
         catch (ImportException)
         {
