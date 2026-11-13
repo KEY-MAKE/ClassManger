@@ -110,6 +110,16 @@ public sealed class AiFileTools
         },
         new()
         {
+            Name = "pdf_to_word",
+            Description = "把 PDF 转成 Word（.docx）。参数：path 是 PDF 路径，output 可选（默认同名 .docx）。"
+                        + "首次使用会自动安装转换引擎（约 50MB，需 1–3 分钟），之后秒开。"
+                        + "转换是纯离线的，文件不会上传到任何服务器。",
+            ParametersJson = """
+            {"type":"object","properties":{"path":{"type":"string","description":"PDF 文件路径"},"output":{"type":"string","description":"可选，输出的 .docx 路径，默认与 PDF 同名"}},"required":["path"]}
+            """,
+        },
+        new()
+        {
             Name = "run_python",
             Description = "执行一段 Python 脚本（可以用 import 使用刚装好的包）。参数：code 脚本内容。",
             ParametersJson = """
@@ -173,6 +183,10 @@ public sealed class AiFileTools
                 "install_tool" => await InstallToolAsync(
                     args?["package"]?.GetValue<string>() ?? string.Empty,
                     args?["kind"]?.GetValue<string>() ?? "python",
+                    ct).ConfigureAwait(false),
+                "pdf_to_word" => await PdfToWordAsync(
+                    args?["path"]?.GetValue<string>() ?? string.Empty,
+                    args?["output"]?.GetValue<string>(),
                     ct).ConfigureAwait(false),
                 "run_python" => await RunPythonAsync(args?["code"]?.GetValue<string>() ?? string.Empty, ct).ConfigureAwait(false),
                 "run_node" => await RunNodeAsync(args?["code"]?.GetValue<string>() ?? string.Empty, ct).ConfigureAwait(false),
@@ -472,6 +486,44 @@ public sealed class AiFileTools
     }
 
     /// <summary>执行 Python 脚本。</summary>
+    /// <summary>
+    /// PDF → Word。算法上走 pdf2docx（离线、不联网），
+    /// 转换完把结果路径交给模型，需要修结构时它再自己用 read_file / write_docx 处理。
+    /// </summary>
+    private async Task<string> PdfToWordAsync(string path, string? output, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return "path 不能为空。";
+        }
+
+        var source = ResolvePath(path, allowEmptyAsRoot: false);
+
+        if (!File.Exists(source))
+        {
+            return $"文件不存在：{source}";
+        }
+
+        string? target = null;
+
+        if (!string.IsNullOrWhiteSpace(output))
+        {
+            target = ResolvePath(output, allowEmptyAsRoot: false);
+        }
+
+        var service = new PdfToWordService();
+        var result = await service.ConvertAsync(source, target, null, ct).ConfigureAwait(false);
+
+        if (!result.Ok)
+        {
+            return result.Message;
+        }
+
+        return result.Message
+               + "\n输出文件：" + result.OutputPath
+               + "\n如果需要，可以再用 read_file 读它、用 write_docx 重排结构（比如把拆碎的段落合并）。";
+    }
+
     private async Task<string> RunPythonAsync(string code, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(code))
@@ -479,9 +531,7 @@ public sealed class AiFileTools
             return "code 不能为空。";
         }
 
-        // 内置 Python 在课件引擎里，用户没用过「试卷转课件」时还没解压。
-        // 这里顺手把它准备出来（首次约几秒），否则老师们的电脑上
-        // （没装 Python）会直接报「找不到解释器」。
+        // ① 先试内置的（课件引擎里那份嵌入式 Python，能跑标准库 + python-docx）
         if (ToolInstaller.FindPython() is null)
         {
             var engine = AppServices.Exam2Ppt;
@@ -492,6 +542,19 @@ public sealed class AiFileTools
                 return "当前电脑没有可用的 Python 运行环境，且内置运行时准备失败："
                        + (engine.LastEngineError ?? "未知原因")
                        + "\n请改用不依赖 Python 的方式完成任务（比如直接用写文件工具生成结果）。";
+            }
+        }
+
+        // ② 连内置的都没有 → 自动装一份完整 Python（带 pip），一次投入永久可用
+        if (ToolInstaller.FindPython() is null)
+        {
+            var install = await PythonBootstrap.EnsureAsync(null, ct).ConfigureAwait(false);
+
+            if (!install.Ok)
+            {
+                return "运行 Python 失败：本机没有 Python 环境，自动安装也没成功。\n"
+                       + install.Message
+                       + "\n请改用不依赖 Python 的方式完成任务。";
             }
         }
 
