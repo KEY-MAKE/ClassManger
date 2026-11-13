@@ -53,10 +53,14 @@ jobs:
           $size = (Get-Item $exe).Length
           $url = "https://github.com/$repo/releases/download/${{ github.ref_name }}/ClassManager.App.exe"
 
-          # 国内直连 GitHub 慢（实测 14KB/s），这两个加速前缀实测 369–516KB/s
+          # 国内直连 GitHub 慢（实测 14KB/s），下面是实测能通的加速前缀。
+          # 公益镜像会失效 —— 2026-11-13 实测 api.gitproxy.dev / gh.llkk.cc /
+          # mirror.ghproxy.com 都不通了，所以多放几个，程序会逐个试。
+          # 顺序按「实测可用性」排，第一个不行自动换下一个。
           $mirrors = @(
-            "https://api.gitproxy.dev/$url",
-            "https://ghfast.top/$url"
+            "https://ghfast.top/$url",
+            "https://ghproxy.net/$url",
+            "https://githubproxy.cc/$url"
           )
 
           $manifest = [ordered]@{

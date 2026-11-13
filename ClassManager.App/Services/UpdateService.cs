@@ -49,6 +49,10 @@ public sealed class UpdateService : IUpdateService
         AutomaticDecompression = DecompressionMethods.All,
         UseProxy = false,
         AllowAutoRedirect = true,
+
+        // 清单要按顺序试多个源，每个源都干等 20 秒会让「检查更新」转圈好几分钟。
+        // 连不上就 5 秒内放弃，换下一个。
+        ConnectTimeout = TimeSpan.FromSeconds(5),
     })
     {
         Timeout = TimeSpan.FromSeconds(20),
@@ -266,7 +270,7 @@ public sealed class UpdateService : IUpdateService
                 progress?.Report(100);
                 return UpdateDownloadResult.Success(target);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 TryDelete(temp);
                 throw;
@@ -307,7 +311,15 @@ public sealed class UpdateService : IUpdateService
         }
     }
 
-    /// <summary>16 路并发 Range 下载，各自写进文件自己的位置。</summary>
+    /// <summary>
+    /// 分片下载：先按 <see cref="DownloadParts"/> 路并发；遇到镜像的并发限流（HTTP 429 / 403）再降级。
+    /// <para>
+    /// 实测（2026-11-13）：直连 GitHub 时 16 路确实快得多（14KB/s → 285KB/s）；
+    /// 但公益加速镜像会限流 —— ghfast.top 开到 8 路就直接 429。
+    /// 所以不能一刀切砍并发，也不能一味并发：先试多的，被限流就退到单流。
+    /// 单流实测 0.7MB/s，79MB 约 2 分钟，比「直接失败」强得多。
+    /// </para>
+    /// </summary>
     private async Task DownloadSegmentedAsync(
         string url,
         string temp,
@@ -316,7 +328,39 @@ public sealed class UpdateService : IUpdateService
         HttpClient client,
         CancellationToken ct)
     {
-        var chunk = (total + DownloadParts - 1) / DownloadParts;
+        var parts = DownloadParts;
+
+        while (true)
+        {
+            TryDelete(temp);
+
+            try
+            {
+                await DownloadWithPartsAsync(url, temp, total, progress, client, parts, ct).ConfigureAwait(false);
+                return;
+            }
+            catch (HttpRequestException ex) when (
+                parts > 1
+                && (ex.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.Forbidden))
+            {
+                // 镜像限流：并发太多。砍半重试，直到单流。
+                parts = Math.Max(1, parts / 2);
+                progress?.Report(0);
+            }
+        }
+    }
+
+    /// <summary>按指定路数并发 Range 下载，各自写进文件自己的位置。</summary>
+    private async Task DownloadWithPartsAsync(
+        string url,
+        string temp,
+        long total,
+        IProgress<int>? progress,
+        HttpClient client,
+        int parts,
+        CancellationToken ct)
+    {
+        var chunk = (total + parts - 1) / parts;
 
         using (var file = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
         {
@@ -326,7 +370,7 @@ public sealed class UpdateService : IUpdateService
         long done = 0;
         var tasks = new List<Task>();
 
-        for (var i = 0; i < DownloadParts; i++)
+        for (var i = 0; i < parts; i++)
         {
             var start = i * chunk;
             var end = Math.Min(total - 1, start + chunk - 1);
@@ -633,24 +677,108 @@ public sealed class UpdateService : IUpdateService
         return 0;
     }
 
+    /// <summary>清单地址的加速前缀。清单只有几百字节，镜像都扛得住。</summary>
+    private static readonly string[] ManifestMirrors =
+    {
+        "https://ghfast.top/",
+        "https://ghproxy.net/",
+        "https://githubproxy.cc/",
+    };
+
     private static async Task<string> ReadSourceAsync(string source, CancellationToken cancellationToken)
     {
-        if (IsHttpUrl(source))
+        if (!IsHttpUrl(source))
         {
-            // 加时间戳破 CDN 缓存：jsDelivr / GitHub 对同一 URL 会缓存很久，
-            // 不破缓存的话发了新版用户还看到旧版本号。
-            var url = AddCacheBuster(source);
-
-            using var response = await Http
-                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-                .ConfigureAwait(false);
-
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var localPath = ResolveLocalPath(source);
+            return await File.ReadAllTextAsync(localPath, cancellationToken).ConfigureAwait(false);
         }
 
-        var path = ResolveLocalPath(source);
-        return await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+        // 清单地址本身也可能连不上：GitHub 的 releases/latest/download 会 302 到
+        // objects.githubusercontent.com，国内经常直接挂。连不上就查不到更新，
+        // 「检查更新」按钮等于废的 —— 所以这里必须多源重试。
+        var candidates = BuildManifestCandidates(source).ToList();
+        var errors = new List<string>();
+
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // 只给原始地址破缓存：镜像地址带 query 可能被它自己的路由解析错
+            var url = i == 0 ? AddCacheBuster(candidates[i]) : candidates[i];
+
+            try
+            {
+                using var response = await Http
+                    .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                    .ConfigureAwait(false);
+
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // 只有「调用方真的取消了」才往上抛。
+                // HttpClient 超时抛的也是 TaskCanceledException（它继承 OperationCanceledException），
+                // 若不加 when 判断，第一个源一超时就中断整条重试链，多源等于白配。
+                throw;
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{url} → {ex.Message}");
+            }
+        }
+
+        throw new HttpRequestException(
+            "所有更新源都读取失败：" + string.Join("；", errors.Take(3)));
+    }
+
+    /// <summary>按「原始 → 加速前缀 → jsDelivr 兜底」的顺序列出清单候选地址。</summary>
+    private static IEnumerable<string> BuildManifestCandidates(string source)
+    {
+        yield return source;
+
+        if (!source.Contains("github.com/", StringComparison.OrdinalIgnoreCase))
+        {
+            yield break;
+        }
+
+        foreach (var prefix in ManifestMirrors)
+        {
+            yield return prefix + source;
+        }
+
+        // 最后兜底：jsDelivr 读仓库里的 docs/version.json（Actions 每次发版都会提交回去）。
+        // 它有缓存延迟，所以只放在最后 —— 万一返回旧版本，最多是「没发现更新」，不会误下载。
+        var repo = TryParseGitHubRepo(source);
+
+        if (repo is not null)
+        {
+            yield return $"https://cdn.jsdelivr.net/gh/{repo}@main/docs/version.json";
+        }
+    }
+
+    /// <summary>从 github.com 链接里取出 owner/repo。</summary>
+    private static string? TryParseGitHubRepo(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+
+            if (!uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var segments = uri.AbsolutePath.Trim('/').Split('/');
+
+            return segments.Length >= 2 && segments[0].Length > 0 && segments[1].Length > 0
+                ? $"{segments[0]}/{segments[1]}"
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>给地址加一个时间戳参数，绕开 CDN 缓存。</summary>
