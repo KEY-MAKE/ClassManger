@@ -241,6 +241,13 @@ public sealed class AiChatService : IAiChatService
                 工作区：{workspace}
                 （所有相对路径都相对于这个目录；需要时请先用 list_files 看看里面有什么）
 
+                【试卷格式规范】
+                工作区里有一份《试卷格式规范.md》，是程序内置的（不是用户上传的）。
+                当用户说「按规范/按要求/按标准 改试卷」「把试卷整理成能生成课件的格式」
+                「按这个格式改」这类话时，**先 read_file 读《试卷格式规范.md》**，
+                严格照它执行，不要让用户再上传规范。
+                如果工作区里没有这个文件，说明程序没释放成功，直接告诉用户即可。
+
                 你可以使用的工具：
                 - list_files：列出目录内容
                 - read_file：读取文件。支持文本/代码/CSV/JSON、Excel(xlsx/xls)、Word(docx)、PPT(pptx)；
@@ -260,7 +267,7 @@ public sealed class AiChatService : IAiChatService
                 1. search_tool 检索能用的包（别凭空编包名，先查）；
                 2. install_tool 安装（用户拒绝就换个方案或直接问用户，不要反复重试）；
                 3. run_python / run_node 用装好的工具把活干完；
-                4. 只从 PyPI / npm 官方源安装，不要去装来路不明的脚本。
+                4. 只从 PyPI / npm 安装（程序已配好清华源 / npmmirror 镜像），不要去装来路不明的脚本。
 
                 输出规则（很重要）：
                 - 只输出给用户看的内容。你的思考过程不要写出来。

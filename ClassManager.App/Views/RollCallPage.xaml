@@ -161,7 +161,7 @@
 
             <!-- 有数据：右侧仅保留「学生名单」一张内嵌定高列表卡片（底部结果卡已移除） -->
             <Grid Visibility="{Binding HasData, Converter={StaticResource BoolToVisibilityConverter}}">
-                <Border Style="{StaticResource StatCard}" Padding="0" VerticalAlignment="Top">
+                <Border Style="{StaticResource StatCard}" Padding="0">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -191,8 +191,6 @@
                                   Background="Transparent"
                                   HorizontalAlignment="Stretch"
                                   RowHeight="34"
-                                  MaxHeight="460"
-                                  VerticalAlignment="Top"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                             <DataGrid.Columns>

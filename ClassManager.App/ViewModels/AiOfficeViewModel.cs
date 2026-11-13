@@ -149,12 +149,28 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         WorkspacePath = _settings.WorkspaceDirectory;
         IsFullDisk = _settings.PermissionMode == AiPermissionMode.FullDisk;
 
-        foreach (var conversation in _store.LoadConversations())
+        // 把内置的《试卷格式规范.md》放到工作区，AI 用 read_file 就能读到，
+        // 用户不用每次上传 —— 这是「按规范改试卷」的前提。
+        EnsureExamSpecInWorkspace(WorkspacePath);
+
+        // 按最近使用排序：文件的物理顺序不代表新旧，之前直接取 [0] 会选中旧会话
+        var restored = _store.LoadConversations()
+            .OrderByDescending(c => c.UpdatedAt)
+            .ToList();
+
+        foreach (var conversation in restored)
         {
             Conversations.Add(conversation);
         }
 
-        if (Conversations.Count > 0)
+        // 优先恢复「上次真正停留的那个会话」，而不是列表第一个
+        var last = restored.FirstOrDefault(c => c.Id == _settings.LastConversationId);
+
+        if (last is not null)
+        {
+            SelectedConversation = last;
+        }
+        else if (Conversations.Count > 0)
         {
             SelectedConversation = Conversations[0];
         }
@@ -164,6 +180,57 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         }
 
         UpdateStatusTexts();
+    }
+
+    /// <summary>内置试卷规范在工作区里的文件名（用户看到的名字）。</summary>
+    private const string ExamSpecFileName = "试卷格式规范.md";
+
+    /// <summary>
+    /// 把嵌入的《试卷格式规范.md》释放到工作区。
+    /// <para>已存在就不覆盖 —— 用户可能按自己的习惯改过。</para>
+    /// </summary>
+    private static void EnsureExamSpecInWorkspace(string workspace)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(workspace))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(workspace);
+
+            var target = Path.Combine(workspace, ExamSpecFileName);
+
+            if (File.Exists(target))
+            {
+                return;
+            }
+
+            var assembly = typeof(AiOfficeViewModel).Assembly;
+
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("ai.exam-spec.md", StringComparison.OrdinalIgnoreCase));
+
+            if (resourceName is null)
+            {
+                return;
+            }
+
+            using var source = assembly.GetManifestResourceStream(resourceName);
+
+            if (source is null)
+            {
+                return;
+            }
+
+            using var destination = File.Create(target);
+            source.CopyTo(destination);
+        }
+        catch
+        {
+            // 释放失败不影响 AI 办公本身，模型会被告知「工作区没有这个文件」
+        }
     }
 
     /// <summary>会话列表。</summary>
@@ -195,6 +262,7 @@ public sealed partial class AiOfficeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isBusy;
 
+
     [ObservableProperty]
     private string _workspacePath = string.Empty;
 
@@ -216,16 +284,31 @@ public sealed partial class AiOfficeViewModel : ObservableObject
     /// <summary>取消按钮可用性。</summary>
     public bool CanCancel => IsBusy;
 
+    /// <summary>
+    /// 是否允许切换会话。
+    /// 流式回复期间必须锁住：回复是往「当前会话」的消息集合里追加的，
+    /// 中途切走会把内容写进别的会话（用户反馈的「对话串了」）。
+    /// </summary>
+    public bool CanSwitchConversation => !IsBusy;
+
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(CanSend));
         OnPropertyChanged(nameof(CanCancel));
+        OnPropertyChanged(nameof(CanSwitchConversation));
     }
 
     partial void OnInputTextChanged(string value) => OnPropertyChanged(nameof(CanSend));
 
     partial void OnSelectedConversationChanged(AiConversation? value)
     {
+        // 记住这次停留的会话，下次进页面直接恢复到它
+        if (value is not null && _settings.LastConversationId != value.Id)
+        {
+            _settings.LastConversationId = value.Id;
+            _store.SaveSettings(_settings);
+        }
+
         Messages.Clear();
         _history = new List<AiMessage>();
 
