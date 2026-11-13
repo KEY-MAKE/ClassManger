@@ -1,14 +1,14 @@
 {
-  "version": "0.48",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.48/ClassManager.App.exe",
-  "size": 82869333,
-  "sha256": "7473232682d9465d8cd154aa32388420b7b44daf3e2700a6ae553a29ad0be20f",
-  "notes": "feat: 内置试卷规范/座次表主题背景/名单撑满/对话不串；pip 改清华源、npm 改 npmmirror",
+  "version": "0.49",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.49/ClassManager.App.exe",
+  "size": 82899029,
+  "sha256": "d58bfe66d9b7daf2184460a9ce3605e5dbecfea548d724cc926143abb04150da",
+  "notes": "feat: Python 缺失时自动安装完整版（用户级/带pip）；新增 pdf_to_word 工具（pdf2docx 离线转换）",
   "publishedAt": "2026-11-13",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.48/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.48/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.48/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.49/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.49/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.49/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
