@@ -33,12 +33,9 @@ public sealed partial class AboutViewModel : ObservableObject
         _download.Changed += OnDownloadChanged;
         SyncDownloadState();
 
+        // 更新源已内置（用户不可更改），所以不存在「未配置」这种状态
         var last = update.Settings.LastCheckedText ?? string.Empty;
-        UpdateStatusText = last.Length > 0
-            ? "上次检查：" + last
-            : update.Settings.SourceUrl.Length > 0
-                ? "尚未检查过更新"
-                : "尚未配置更新源";
+        UpdateStatusText = last.Length > 0 ? "上次检查：" + last : "尚未检查过更新";
     }
 
     /// <summary>由窗口代码后置注入，用于给子窗口指定 Owner。</summary>
