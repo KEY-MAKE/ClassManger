@@ -1,13 +1,14 @@
 {
-  "version": "0.40",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.40/ClassManager.App.exe",
-  "size": 82817109,
-  "sha256": "6de2bfd5138517d6cdc84d11ed41a4e1064f89978f5de495f321418a9d15e056",
-  "notes": "feat: 导入时跳过 Excel 筛选隐藏行；启动自动恢复上次名单",
+  "version": "0.41",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.41/ClassManager.App.exe",
+  "size": 82820693,
+  "sha256": "1d3424d157f5c46d41db55b63e2077b6d61e9cbeec27cd316443c1ec56412ad8",
+  "notes": "fix(更新): 清单多源重试 + 镜像并发限流自动降级 + 超时不再误判为取消；刷新可用镜像列表",
   "publishedAt": "2026-11-13",
   "mirrors": [
-    "https://api.gitproxy.dev/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.40/ClassManager.App.exe",
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.40/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.41/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.41/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.41/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
