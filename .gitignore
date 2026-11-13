@@ -25,3 +25,6 @@ docs/*.exe
 *.zip
 *.7z
 !ClassManager.App/Assets/engine/*.zip
+
+# WPF 编译期临时工程文件（不该进仓库）
+*_wpftmp.csproj
