@@ -203,7 +203,19 @@ public sealed partial class AboutViewModel : ObservableObject
         // 下载交给应用级管理器：窗口关掉也继续下，完成后再启动新包安装。
         // 不在这里 await —— 这里 await 会让进度回调绑死在当前窗口的 UI 上下文中，
         // 窗口一关就抛异常把下载打断（就是之前的「关窗口 → 下载失败」）。
-        _download.Start(info);
+        try
+        {
+            _download.Start(info);
+        }
+        catch (Exception ex)
+        {
+            // 启动下载失败也不能把程序带崩 —— 老师们的电脑上出这种情况，
+            // 用户看到的是「闪退」，连错误提示都没有。
+            IsDownloading = false;
+            UpdateStatusText = "✗ 无法开始下载：" + ex.Message;
+            await ShowMessageAsync("更新失败", $"无法开始下载：{ex.Message}");
+            return;
+        }
 
         IsDownloading = true;
         DownloadPercent = 0;
