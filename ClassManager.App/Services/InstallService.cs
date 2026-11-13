@@ -298,6 +298,13 @@ public sealed class InstallService : IInstallService
 
         progress?.Report("正在复制程序文件...");
         AppendLog($"安装开始：{source} → {target}（{AppVersion.Display}）");
+
+        // 目标里已经有同名程序（重装/升级到同一目录）→ 等它释放
+        if (!WaitUntilFileUnlocked(Path.Combine(target, ExeName), TimeSpan.FromSeconds(10)))
+        {
+            AppendLog($"等待目标文件释放超时：{Path.Combine(target, ExeName)}");
+        }
+
         CopyProgramFiles(source, target, progress);
 
         var exePath = Path.Combine(target, ExeName);
@@ -575,6 +582,15 @@ public sealed class InstallService : IInstallService
             AppendLog($"开始修复安装（{status.State}）：{currentDir} → {installDir}");
 
             Directory.CreateDirectory(installDir);
+
+            // 应用内更新：旧进程可能还在退出，先等目标 exe 释放，否则覆盖必失败
+            var targetExeBeforeCopy = Path.Combine(installDir, ExeName);
+
+            if (!WaitUntilFileUnlocked(targetExeBeforeCopy, TimeSpan.FromSeconds(20)))
+            {
+                AppendLog($"等待目标文件释放超时：{targetExeBeforeCopy}");
+            }
+
             CopyProgramFiles(currentDir, installDir);
 
             var exePath = Path.Combine(installDir, ExeName);
@@ -736,6 +752,47 @@ public sealed class InstallService : IInstallService
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// 等目标文件被释放（最多 <paramref name="budget"/>）。
+    /// <para>
+    /// 为什么需要：应用内点「立即更新」的时序是
+    /// <c>Launch(新exe)</c> → <c>Shutdown()</c>，两个进程是并发的。
+    /// 新进程往往比旧进程退得早，此时去覆盖 <c>ClassManager.App.exe</c>
+    /// 就会撞上「文件正被另一个进程使用」→ 更新失败。
+    /// </para>
+    /// <para>返回 true 表示可以写（或文件不存在），false 表示超时仍被占用。</para>
+    /// </summary>
+    private static bool WaitUntilFileUnlocked(string path, TimeSpan budget)
+    {
+        if (!File.Exists(path))
+        {
+            return true;
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        while (stopwatch.Elapsed < budget)
+        {
+            try
+            {
+                // 能以「不允许共享」的方式打开，说明没有别的进程占着它
+                using var probe = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                return true;
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(300);
+            }
+            catch
+            {
+                // 权限等问题：交给后面真正的复制去报错
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
