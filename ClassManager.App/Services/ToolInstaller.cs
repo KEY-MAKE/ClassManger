@@ -328,10 +328,21 @@ public sealed class ToolInstaller
 
         // 内置的嵌入式 Python 是裁剪版（没有 pip / ensurepip），装不了第三方包。
         // 放在包名校验之后判断 —— 非法包名要优先被拦下来。
+        //
+        // 这时不再一拒了之：自动装一份完整 Python（带 pip），装完继续装包。
+        // 装到 %LocalAppData%\Programs\Python，用户级，不需要管理员。
         if (string.Equals(python, FindBundledPython(), StringComparison.OrdinalIgnoreCase))
         {
-            return "当前使用的是程序内置的 Python（精简版，不含 pip），无法安装第三方包。"
-                   + "请改用标准库完成任务，或直接用 write_xlsx / write_docx / write_pptx 这些原生工具生成文件。";
+            var install = await PythonBootstrap.EnsureAsync(null, ct).ConfigureAwait(false);
+
+            if (!install.Ok || install.PythonPath is null)
+            {
+                return "内置 Python 是精简版（不含 pip），尝试自动安装完整版也失败了："
+                       + install.Message
+                       + "\n请改用标准库完成任务，或直接用 write_xlsx / write_docx / write_pptx 这些原生工具。";
+            }
+
+            python = install.PythonPath;
         }
 
         Directory.CreateDirectory(PythonToolsDirectory);

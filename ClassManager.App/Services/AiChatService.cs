@@ -259,6 +259,8 @@ public sealed class AiChatService : IAiChatService
                 - create_directory：创建目录（可以一次建多级）
                 - web_fetch：抓取网页正文
                 - search_tool：联网检索可用的库/工具（查 PyPI + 网页搜索）
+                - pdf_to_word：把 PDF 转成 Word（纯离线，文件不上传）。用户要「PDF 转 Word」时直接用它，
+                  首次会自动装转换引擎（约 50MB），装完再转。
                 - install_tool：把检索到的包安装到工作区 _tools/（会先请用户确认）
                 - run_python：执行一段 Python 脚本（可以 import 刚装好的包）
                 - run_node：执行一段 Node 脚本（可以 require 刚装好的包）

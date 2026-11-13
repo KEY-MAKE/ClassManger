@@ -184,6 +184,7 @@ public class AiDsmlParserTests
             ["write_pptx"] = new[] { "path", "content" },
             ["search_tool"] = new[] { "query" },
             ["install_tool"] = new[] { "package" },
+            ["pdf_to_word"] = new[] { "path" },
             ["run_python"] = new[] { "code" },
             ["run_node"] = new[] { "code" },
             ["web_fetch"] = new[] { "url" },
