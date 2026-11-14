@@ -1,14 +1,14 @@
 {
-  "version": "0.51",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.51/ClassManager.App.exe",
-  "size": 82908757,
-  "sha256": "ee093ddcaef01d20cf9adc204fd356db60d5b4d2faf808bf855a7196cb300fe8",
-  "notes": "fix(严重): FindPython 优先用带 pip 的完整版——之前优先内置精简版导致「装好了却说 pip 不可用」",
+  "version": "0.52",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.52/ClassManager.App.exe",
+  "size": 82912853,
+  "sha256": "2d85a7bce866357624e8e4ac5ba1e9cd02bbc6b9d2e9960611ac3a2098860e60",
+  "notes": "feat: PDF 转 Word 支持 AI 整理段落（按内置试卷规范重排，另存 _AI整理.docx）",
   "publishedAt": "2026-11-14",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.51/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.51/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.51/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.52/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.52/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.52/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
