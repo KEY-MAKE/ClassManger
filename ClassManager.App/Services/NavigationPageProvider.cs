@@ -22,6 +22,16 @@ public sealed class NavigationPageProvider : INavigationViewPageProvider
     /// <inheritdoc />
     public object? GetPage(Type pageType)
     {
+        if (pageType == typeof(PdfToWordPage))
+        {
+            var page = new PdfToWordPage();
+
+            // PDF 转换页不依赖壳（不需要共享状态），直接给个 VM 就行
+            page.DataContext = new PdfToWordViewModel();
+
+            return page;
+        }
+
         if (pageType == typeof(RollCallPage))
         {
             var page = new RollCallPage();

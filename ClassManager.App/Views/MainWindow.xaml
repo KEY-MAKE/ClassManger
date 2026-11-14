@@ -65,6 +65,11 @@
                         <ui:SymbolIcon Symbol="SlideText24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="PDF 转 Word" TargetPageType="{x:Type views:PdfToWordPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="DocumentPdf24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
                 <ui:NavigationViewItem Content="AI 办公" TargetPageType="{x:Type views:AiOfficePage}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="ChatSparkle24" />
