@@ -49,13 +49,23 @@ public sealed class ToolInstaller
     /// </summary>
     public static string? FindPython()
     {
-        var bundled = FindBundledPython();
+        // 优先级（很重要）：
+        // 1) 完整安装版 —— 带 pip，能装 pdf2docx 这类第三方库
+        // 2) PATH 里的
+        // 3) Store 版 / py 启动器
+        // 4) 最后才用内置嵌入版 —— 它能跑标准库脚本，但**没有 pip**，
+        //    一旦把它排前面，就会出现「明明装好了完整版，程序却说 pip 不可用」。
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-        if (bundled is not null)
+        // 1) %LOCALAPPDATA%\Programs\Python\Python3xx\python.exe
+        var installed = FindInstalledPython(localAppData);
+
+        if (installed is not null)
         {
-            return bundled;
+            return installed;
         }
 
+        // 2) PATH
         foreach (var candidate in new[] { "python.exe", "python3.exe" })
         {
             var path = FindOnPath(candidate);
@@ -65,36 +75,50 @@ public sealed class ToolInstaller
             }
         }
 
-        // %LOCALAPPDATA%\Programs\Python\Python3xx\python.exe
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var installsRoot = Path.Combine(localAppData, "Programs", "Python");
-
-        if (Directory.Exists(installsRoot))
-        {
-            var candidates = Directory.GetDirectories(installsRoot)
-                .Where(d => Path.GetFileName(d).StartsWith("Python", StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(d => d, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var dir in candidates)
-            {
-                var exe = Path.Combine(dir, "python.exe");
-                if (File.Exists(exe))
-                {
-                    return exe;
-                }
-            }
-        }
-
-        // Microsoft Store 版（WindowsApps 里是转发器，也能用）
+        // 3) Microsoft Store 版（WindowsApps 里是转发器，也能用）
         var storePython = Path.Combine(localAppData, "Microsoft", "WindowsApps", "python.exe");
         if (File.Exists(storePython))
         {
             return storePython;
         }
 
-        // 退到 py 启动器
         var launcher = Path.Combine(localAppData, "Programs", "Python", "Launcher", "py.exe");
-        return File.Exists(launcher) ? launcher : null;
+        if (File.Exists(launcher))
+        {
+            return launcher;
+        }
+
+        // 4) 兜底：内置嵌入版
+        return FindBundledPython();
+    }
+
+    /// <summary>
+    /// 找「完整安装版」Python（<c>%LOCALAPPDATA%\Programs\Python\Python3xx</c>）。
+    /// <para>这是唯一默认带 pip 的那种，装第三方库必须用它。</para>
+    /// </summary>
+    public static string? FindInstalledPython(string? localAppData = null)
+    {
+        try
+        {
+            localAppData ??= Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+            var installsRoot = Path.Combine(localAppData, "Programs", "Python");
+
+            if (!Directory.Exists(installsRoot))
+            {
+                return null;
+            }
+
+            return Directory.GetDirectories(installsRoot)
+                .Where(d => Path.GetFileName(d).StartsWith("Python", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(d => d, StringComparer.OrdinalIgnoreCase)
+                .Select(d => Path.Combine(d, "python.exe"))
+                .FirstOrDefault(File.Exists);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
