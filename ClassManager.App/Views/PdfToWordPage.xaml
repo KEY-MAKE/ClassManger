@@ -74,6 +74,16 @@
                     <StackPanel>
                         <TextBlock Text="③ 开始转换" Style="{StaticResource SectionHeaderTextStyle}" />
 
+                        <CheckBox Content="转换后用 AI 整理段落结构"
+                                  IsChecked="{Binding UseAiCleanup}"
+                                  Margin="0,0,0,4" />
+
+                        <TextBlock Text="勾选后，除了转出 docx，还会让 AI 按《试卷格式规范》重新分段，另存为「原名_AI整理.docx」（原稿保留）。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+
                         <ui:Button Content="开始转换"
                                    Appearance="Primary"
                                    HorizontalAlignment="Stretch"
