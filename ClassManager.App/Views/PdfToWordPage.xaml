@@ -1,0 +1,158 @@
+<Page x:Class="ClassManager.App.Views.PdfToWordPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="PDF 转 Word"
+      AllowDrop="True"
+      DragOver="OnDragOver"
+      Drop="OnDrop">
+    <Grid x:Name="Root" Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左栏：参数 -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,16,0">
+            <StackPanel>
+                <!-- ① 选择文件 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="① 选择 PDF" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding PdfPath, Mode=OneWay}"
+                                        PlaceholderText="选择 PDF 文件（也可以直接拖进来）"
+                                        IsReadOnly="True"
+                                        ToolTip="{Binding PdfPath}" />
+                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                       Command="{Binding BrowsePdfCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="转换是纯离线的：文件不会上传到任何服务器，试卷内容不外泄。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ② 输出位置 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="② 输出位置" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding OutputDirectory, Mode=OneWay}"
+                                        PlaceholderText="输出到哪个文件夹"
+                                        IsReadOnly="True"
+                                        ToolTip="{Binding OutputDirectory}" />
+                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                       Command="{Binding BrowseOutputCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="文件名沿用 PDF 的原名，扩展名换成 .docx。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ③ 操作 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="③ 开始转换" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <ui:Button Content="开始转换"
+                                   Appearance="Primary"
+                                   HorizontalAlignment="Stretch"
+                                   IsEnabled="{Binding CanStart}"
+                                   Command="{Binding ConvertCommand}" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <ui:Button Content="打开结果"
+                                       IsEnabled="{Binding HasResult}"
+                                       Command="{Binding OpenResultCommand}"
+                                       Margin="0,0,8,0" />
+                            <ui:Button Content="打开输出目录"
+                                       Command="{Binding OpenOutputFolderCommand}" />
+                        </StackPanel>
+
+                        <TextBlock Text="首次转换会先安装转换引擎（约 50MB，1–3 分钟），之后就快了。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 右栏：状态 + 日志 -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource StatCard}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="状态" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                    <TextBlock Text="{Binding StatusText}"
+                               Style="{StaticResource BodyTextStyle}"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Text="{Binding OutputFileText}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,6,0,0"
+                               Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibilityConverter}}" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" Style="{StaticResource StatCard}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="过程日志"
+                               Style="{StaticResource SectionHeaderTextStyle}"
+                               Margin="14,12,14,8" />
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Logs}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             Margin="6,0,6,8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           TextWrapping="Wrap"
+                                           Margin="6,2" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>
