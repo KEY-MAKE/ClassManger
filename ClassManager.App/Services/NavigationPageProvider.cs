@@ -19,6 +19,15 @@ public sealed class NavigationPageProvider : INavigationViewPageProvider
     /// </summary>
     private AiOfficeViewModel? _aiOfficeViewModel;
 
+    /// <summary>
+    /// PDF 转 Word 的 ViewModel 缓存。
+    /// <para>
+    /// 不缓存的话，切到别的模块再回来会重建 VM —— 正在跑的转换任务还在后台跑，
+    /// 但界面上的进度、日志、输入框全清空了，用户看到的就是「进度被重置」。
+    /// </para>
+    /// </summary>
+    private PdfToWordViewModel? _pdfToWordViewModel;
+
     /// <inheritdoc />
     public object? GetPage(Type pageType)
     {
@@ -26,8 +35,9 @@ public sealed class NavigationPageProvider : INavigationViewPageProvider
         {
             var page = new PdfToWordPage();
 
-            // PDF 转换页不依赖壳（不需要共享状态），直接给个 VM 就行
-            page.DataContext = new PdfToWordViewModel();
+            // 复用同一个 VM：转换是后台任务，切走再回来要能看到还在跑的进度与日志
+            _pdfToWordViewModel ??= new PdfToWordViewModel();
+            page.DataContext = _pdfToWordViewModel;
 
             return page;
         }
