@@ -82,7 +82,19 @@ public interface IAiChatService
 internal sealed class AiCredentials
 {
     public string BaseUrl { get; init; } = string.Empty;
+
+    /// <summary>首选模型。</summary>
     public string Model { get; init; } = string.Empty;
+
+    /// <summary>
+    /// 备用模型：主模型的所有 key 都配额用尽/限流时，按顺序换着试。
+    /// <para>
+    /// 这个平台是按模型分配配额的 —— deepseek 用完了，别的模型往往还有额度。
+    /// 没有这一层的话，主模型一 429 整个 AI 办公就瘫了。
+    /// </para>
+    /// </summary>
+    public List<string> Fallbacks { get; init; } = new();
+
     public List<string> Keys { get; init; } = new();
 }
 
@@ -134,8 +146,71 @@ public sealed class AiChatService : IAiChatService
             return new AiTurnResult { Ok = false, Error = "未找到内置 API Key。" };
         }
 
-        var body = BuildRequestBody(history, tools);
+        // 模型轮换：这个平台按「模型」分配配额，主模型用完了别的模型往往还有额度。
+        // 不轮换的话，deepseek 一 429 整个 AI 办公就瘫了。
+        var models = new List<string>();
 
+        if (!string.IsNullOrWhiteSpace(_credentials.Model))
+        {
+            models.Add(_credentials.Model);
+        }
+
+        foreach (var fallback in _credentials.Fallbacks)
+        {
+            if (!string.IsNullOrWhiteSpace(fallback)
+                && !models.Contains(fallback, StringComparer.OrdinalIgnoreCase))
+            {
+                models.Add(fallback);
+            }
+        }
+
+        if (models.Count == 0)
+        {
+            models.Add(string.Empty);
+        }
+
+        var modelErrors = new List<string>();
+
+        for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+        {
+            var model = models[modelIndex];
+            var body = BuildRequestBody(history, tools, model);
+
+            var outcome = await TryAllKeysAsync(body, stream, ct).ConfigureAwait(false);
+
+            if (outcome is not null)
+            {
+                return outcome;
+            }
+
+            modelErrors.Add(model);
+
+            // 还有下一个模型 → 换着试
+            if (modelIndex < models.Count - 1)
+            {
+                stream?.Report(new AiStreamUpdate(
+                    null,
+                    null,
+                    $"{model} 配额用尽或不可用，换用 {models[modelIndex + 1]} 重试…"));
+            }
+        }
+
+        return new AiTurnResult
+        {
+            Ok = false,
+            Error = "所有模型与 API Key 都不可用（" + string.Join(" / ", modelErrors) + "）。\n"
+                    + _lastErrorSummary,
+        };
+    }
+
+    /// <summary>
+    /// 用同一个请求体把所有 key 试一遍；全部失败返回 null（交给上层换模型）。
+    /// </summary>
+    private async Task<AiTurnResult?> TryAllKeysAsync(
+        string body,
+        IProgress<AiStreamUpdate>? stream,
+        CancellationToken ct)
+    {
         // 每把 key 最多尝试 3 次（限流是"通道级"的，隔一会儿通常会放开，直接切 key 往往两个都凉）
         const int maxAttemptsPerKey = 3;
         var backoff = new[] { 3000, 8000 };
@@ -184,6 +259,17 @@ public sealed class AiChatService : IAiChatService
                 errors.Add($"{label} 第{attempt + 1}次: {outcome.Error}");
 
                 // 限流/繁忙 → 同一把 key 退避重试；鉴权/余额 → 立刻换 key
+                //
+                // 但「配额用尽」不要重试：这个平台按模型分配配额，配额是真没了，
+                // 等 3 秒 8 秒都没用 —— 只有换模型才有救。原来 6 把 key × 3 次 ≈ 34 秒，
+                // 砍掉之后几秒就能换到能用的模型。
+                if (outcome.RateLimited && IsQuotaExhausted(outcome.Error))
+                {
+                    switchKey = true;
+                    stream?.Report(new AiStreamUpdate(null, null, $"{label} 配额用尽，换下一个通道…"));
+                    break;
+                }
+
                 if (!outcome.Retryable || attempt == maxAttemptsPerKey - 1)
                 {
                     switchKey = true;
@@ -201,18 +287,23 @@ public sealed class AiChatService : IAiChatService
             }
         }
 
-        var rateLimited = errors.Any(e => e.Contains("限流", StringComparison.Ordinal));
+        // 全部 key 都失败 → 记下原因，返回 null 让上层换模型
+        _lastErrorSummary = errors.Count > 0
+            ? string.Join("；", errors.TakeLast(2))
+            : "无可用 Key。";
 
-        return new AiTurnResult
-        {
-            Ok = false,
-            Error = rateLimited
-                ? "所有通道都触发了限流（每个通道已重试 3 次）。\n"
-                  + "这是服务端的请求频率限制，通常等 30~60 秒就会恢复，稍后重试即可。\n"
-                  + "详细：" + string.Join("；", errors.TakeLast(2))
-                : "所有 API Key 均不可用。\n" + string.Join("\n", errors.TakeLast(3)),
-        };
+        return null;
     }
+
+    /// <summary>最近一次所有 key 失败的摘要（给最终错误信息用）。</summary>
+    private string _lastErrorSummary = string.Empty;
+
+    /// <summary>这个错误是不是「配额真的用完了」（而不是瞬时拥塞）。</summary>
+    private static bool IsQuotaExhausted(string? error) =>
+        !string.IsNullOrEmpty(error)
+        && (error.Contains("quota", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("额度", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("quota_exceeded", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// 系统提示词：告诉模型它是一个本地 agent、有哪些工具、工作区在哪。
@@ -286,7 +377,10 @@ public sealed class AiChatService : IAiChatService
                 """;
     }
 
-    private string BuildRequestBody(IReadOnlyList<AiMessage> history, IReadOnlyList<AiToolSpec> tools)
+    private string BuildRequestBody(
+        IReadOnlyList<AiMessage> history,
+        IReadOnlyList<AiToolSpec> tools,
+        string model)
     {
         var messages = new JsonArray();
 
@@ -338,7 +432,7 @@ public sealed class AiChatService : IAiChatService
 
         var root = new JsonObject
         {
-            ["model"] = _credentials.Model,
+            ["model"] = model,
             ["messages"] = messages,
             // 推理型模型会先消耗思考 token，给小上限会导致正文为空
             ["max_tokens"] = 16384,
