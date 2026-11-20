@@ -139,15 +139,28 @@ public partial class AiOfficePage : Page
 
     private void OnInputPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter)
+        // 主键盘 Enter 是 Key.Enter，小键盘是 Key.Return，两个都要管
+        if (e.Key is not (Key.Enter or Key.Return))
         {
             return;
         }
 
-        // Shift+Enter / Ctrl+Enter 都走默认行为（换行）
-        // 写长段落时 Shift 按着别扭，Ctrl+Enter 是常见习惯
+        // Shift+Enter / Ctrl+Enter 换行。
+        // 这里**手动插入换行**而不是「放手让默认行为处理」——
+        // ui:TextBox 在某些情况下会吞掉带修饰键的 Enter，
+        // 交给默认行为的结果就是「按了没反应」。
         if ((Keyboard.Modifiers & (ModifierKeys.Shift | ModifierKeys.Control)) != 0)
         {
+            if (sender is TextBox box)
+            {
+                var caret = box.CaretIndex;
+                var newline = Environment.NewLine;
+
+                box.Text = box.Text.Insert(caret, newline);
+                box.CaretIndex = caret + newline.Length;
+            }
+
+            e.Handled = true;
             return;
         }
 

@@ -291,7 +291,15 @@ public sealed partial class PdfToWordViewModel : ObservableObject
 
             if (!reply.Ok || string.IsNullOrWhiteSpace(reply.Content))
             {
-                AppendLog("✗ AI 整理失败：" + (reply.Error ?? "模型没有返回内容"));
+                // ReasoningOnly = 模型只吐了「思考过程」，正文是空的
+                // （推理型模型遇到长输入时，token 全被思考吃掉）。
+                var why = reply.ReasoningOnly
+                    ? "模型只输出了思考过程、没给正文（长规范+长正文时容易发生）。"
+                      + "原稿已保留，稍后重试或取消勾选「AI 整理」先要原稿。"
+                    : (reply.Error ?? "模型没有返回内容");
+
+                AppendLog("✗ AI 整理失败：" + why);
+                StatusText = "AI 整理没成功（原稿已生成）";
                 return;
             }
 
@@ -336,25 +344,48 @@ public sealed partial class PdfToWordViewModel : ObservableObject
     }
 
     /// <summary>读工作区里的《试卷格式规范.md》。</summary>
-    private static string ReadExamSpec()
+    private string ReadExamSpec()
     {
+        // 依次尝试：设置里的工作区 → 默认工作区（Documents\ClassManager AI）→ 两个都找一遍
+        var candidates = new List<string>();
+
         try
         {
-            var workspace = AppServices.AiStore.LoadSettings().WorkspaceDirectory;
+            var configured = AppServices.AiStore.LoadSettings().WorkspaceDirectory;
 
-            if (string.IsNullOrWhiteSpace(workspace))
+            if (!string.IsNullOrWhiteSpace(configured))
             {
-                return string.Empty;
+                candidates.Add(configured);
             }
-
-            var path = Path.Combine(workspace, "试卷格式规范.md");
-
-            return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
         }
         catch
         {
-            return string.Empty;
+            // 设置读不出来就靠默认值
         }
+
+        candidates.Add(AiSettings.DefaultWorkspace);
+
+        foreach (var workspace in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var path = Path.Combine(workspace, "试卷格式规范.md");
+
+                if (File.Exists(path))
+                {
+                    Logs.Add($"[{DateTime.Now:HH:mm:ss}] 已读到规范：{path}");
+                    return File.ReadAllText(path);
+                }
+
+                Logs.Add($"[{DateTime.Now:HH:mm:ss}] 这个位置没有规范：{path}");
+            }
+            catch
+            {
+                // 换下一个候选
+            }
+        }
+
+        return string.Empty;
     }
 
     /// <summary>整理提示词。</summary>
