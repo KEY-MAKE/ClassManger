@@ -187,6 +187,7 @@ public class AiDsmlParserTests
             ["pdf_to_word"] = new[] { "path" },
             ["run_python"] = new[] { "code" },
             ["run_node"] = new[] { "code" },
+            ["web_search"] = new[] { "query" },
             ["web_fetch"] = new[] { "url" },
             ["create_directory"] = new[] { "path" },
         };

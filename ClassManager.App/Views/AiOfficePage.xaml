@@ -269,7 +269,7 @@
                         <ui:TextBox Grid.Row="1"
                                     x:Name="InputBox"
                                     Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="问我任何事… 可把文件拖进本页让我读取（Enter 发送，Shift+Enter 换行）"
+                                    PlaceholderText="问我任何事… 可把文件拖进本页让我读取（Enter 发送，Shift/Ctrl+Enter 换行）"
                                     AcceptsReturn="True"
                                     TextWrapping="Wrap"
                                     Height="64"
@@ -290,6 +290,22 @@
                                        TextTrimming="CharacterEllipsis" />
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <!-- 优化提示词：把输入框里这段话改写得更有条理 -->
+                                <ui:Button Appearance="Transparent"
+                                           Padding="6"
+                                           ToolTip="优化提示词（让 AI 把这段话改写得更清晰；会消耗一次调用）"
+                                           Icon="{ui:SymbolIcon Sparkle24}"
+                                           IsEnabled="{Binding CanOptimize}"
+                                           Command="{Binding OptimizePromptCommand}" />
+
+                                <!-- 当前模型：主模型额度用完时会自动切备用，这里能看到实际用的哪个 -->
+                                <TextBlock Text="{Binding ModelBadgeText}"
+                                           VerticalAlignment="Center"
+                                           Margin="2,0,10,0"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           ToolTip="当前使用的模型。主模型额度用尽时会自动切到备用模型。" />
+
                                 <ui:Button Content="取消" Margin="0,0,8,0"
                                            IsEnabled="{Binding CanCancel}"
                                            Command="{Binding CancelCommand}" />

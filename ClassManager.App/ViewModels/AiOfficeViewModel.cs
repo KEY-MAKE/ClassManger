@@ -144,7 +144,7 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         _store = AppServices.AiStore;
 
         _settings = _store.LoadSettings();
-        _tools = new AiFileTools(_settings, ConfirmWriteAsync);
+        _tools = CreateTools();
 
         WorkspacePath = _settings.WorkspaceDirectory;
         IsFullDisk = _settings.PermissionMode == AiPermissionMode.FullDisk;
@@ -180,6 +180,7 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         }
 
         UpdateStatusTexts();
+        RefreshModelBadge();
     }
 
     /// <summary>内置试卷规范在工作区里的文件名（用户看到的名字）。</summary>
@@ -230,6 +231,176 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         catch
         {
             // 释放失败不影响 AI 办公本身，模型会被告知「工作区没有这个文件」
+        }
+    }
+
+    /// <summary>
+    /// 按当前会话创建工具集。
+    /// <para>
+    /// <b>工作区隔离</b>：工作区模式下，每个对话给一个独立子目录
+    /// （<c>工作区/_conversations/&lt;StorageKey&gt;/</c>），
+    /// 这样在 A 对话里生成的文件不会出现在 B 对话里，删会话时整个目录一起删。
+    /// </para>
+    /// <para>「完全访问」模式是用户明确授权的，不隔离 —— 沿用他选的那个根目录。</para>
+    /// </summary>
+    private AiFileTools CreateTools()
+    {
+        if (_settings.PermissionMode == AiPermissionMode.FullDisk)
+        {
+            return new AiFileTools(_settings, ConfirmWriteAsync);
+        }
+
+        var folder = ConversationFolder();
+
+        try
+        {
+            Directory.CreateDirectory(folder);
+
+            // 规范文件也放一份到会话目录：AI 现在能访问的是会话目录，
+            // 只放根目录的话它 read_file 会找不到。
+            EnsureExamSpecInWorkspace(folder);
+        }
+        catch
+        {
+            // 建不出来就退回根工作区，别让工具直接不可用
+            return new AiFileTools(_settings, ConfirmWriteAsync);
+        }
+
+        var scoped = new AiSettings
+        {
+            WorkspaceDirectory = folder,
+            PermissionMode = _settings.PermissionMode,
+            LastConversationId = _settings.LastConversationId,
+        };
+
+        return new AiFileTools(scoped, ConfirmWriteAsync);
+    }
+
+    /// <summary>刷新右下角的模型徽标。</summary>
+    private void RefreshModelBadge()
+    {
+        try
+        {
+            var chat = AppServices.Ai;
+            var primary = chat.PrimaryModel;
+            var used = chat.LastUsedModel;
+
+            if (string.IsNullOrWhiteSpace(used))
+            {
+                ModelBadgeText = PrettyModelName(primary);
+                return;
+            }
+
+            ModelBadgeText = string.Equals(used, primary, StringComparison.OrdinalIgnoreCase)
+                ? PrettyModelName(used)
+                : PrettyModelName(used) + "（备用）";
+        }
+        catch
+        {
+            ModelBadgeText = string.Empty;
+        }
+    }
+
+    /// <summary>deepseek-v4.1-flash-1017 → DeepSeek-V4.1-Flash</summary>
+    private static string PrettyModelName(string model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return "未知模型";
+        }
+
+        var parts = model.Split('-', StringSplitOptions.RemoveEmptyEntries).ToList();
+
+        // 去掉结尾的纯数字段（-1017 这种日期后缀）
+        while (parts.Count > 1 && parts[^1].All(char.IsDigit))
+        {
+            parts.RemoveAt(parts.Count - 1);
+        }
+
+        if (parts.Count == 0)
+        {
+            return model;
+        }
+
+        // 第一段首字母大写：deepseek → DeepSeek
+        parts[0] = char.ToUpperInvariant(parts[0][0]) + parts[0][1..];
+
+        return string.Join('-', parts);
+    }
+
+    /// <summary>
+    /// 优化当前输入框里的提示词（右下角星星按钮）。
+    /// <para>
+    /// 只做「改写」，不动用户的原意；失败就保留原文，不打断输入。
+    /// </para>
+    /// </summary>
+    [RelayCommand]
+    private async Task OptimizePromptAsync()
+    {
+        if (!CanOptimize)
+        {
+            return;
+        }
+
+        var original = InputText.Trim();
+
+        if (original.Length == 0)
+        {
+            return;
+        }
+
+        IsOptimizing = true;
+        StatusText = "正在优化提示词…";
+
+        try
+        {
+            // 注意：CompleteAsync 会自动加一条「AI 办公」的系统提示词（含工具说明），
+            // 所以这里明确要求「不要调工具、只输出改写结果」，否则模型可能跑去干活。
+            var instruction =
+                "下面这一段是用户写的需求草稿。请把它改写成一条更清晰、更具体的指令，然后**只输出改写后的文本**。\n\n"
+                + "规则：\n"
+                + "1. 保留原意，不要增加用户没提到的需求；\n"
+                + "2. 可以补充让指令更可执行的信息（比如要输出什么格式、要处理哪些文件），但不要编造具体数值或文件路径；\n"
+                + "3. 不要在改写结果里解释你自己做了什么；\n"
+                + "4. 不要调用任何工具，这是纯文本改写任务；\n"
+                + "5. 原文已经足够清楚就原样返回。\n\n"
+                + "原文：\n" + original;
+
+            var history = new List<AiMessage>
+            {
+                new() { Role = "user", Content = instruction },
+            };
+
+            var reply = await _chat
+                .CompleteAsync(history, Array.Empty<AiToolSpec>(), null, CancellationToken.None)
+                .ConfigureAwait(true);
+
+            if (!reply.Ok || string.IsNullOrWhiteSpace(reply.Content))
+            {
+                StatusText = "优化失败：" + (reply.Error ?? "模型没返回内容");
+                return;
+            }
+
+            var cleaned = reply.Content.Trim().Trim('"', '“', '”', '\'');
+
+            // 防一手：模型偶尔会把整段解释也吐出来，太长就当失败保留原文
+            if (cleaned.Length > original.Length * 4 + 200)
+            {
+                StatusText = "优化结果异常长，已保留原文";
+                return;
+            }
+
+            InputText = cleaned;
+            StatusText = "提示词已优化";
+            RefreshModelBadge();
+        }
+        catch (Exception ex)
+        {
+            StatusText = "优化出错：" + ex.Message;
+        }
+        finally
+        {
+            IsOptimizing = false;
         }
     }
 
@@ -284,6 +455,17 @@ public sealed partial class AiOfficeViewModel : ObservableObject
     /// <summary>取消按钮可用性。</summary>
     public bool CanCancel => IsBusy;
 
+    /// <summary>右下角显示的当前模型（主模型配额耗尽时会是 fallback 那个）。</summary>
+    [ObservableProperty]
+    private string _modelBadgeText = string.Empty;
+
+    /// <summary>提示词优化进行中。</summary>
+    [ObservableProperty]
+    private bool _isOptimizing;
+
+    /// <summary>能不能点「优化提示词」：有内容、没在发送、没在优化。</summary>
+    public bool CanOptimize => !IsBusy && !IsOptimizing && InputText.Trim().Length > 0;
+
     /// <summary>
     /// 是否允许切换会话。
     /// 流式回复期间必须锁住：回复是往「当前会话」的消息集合里追加的，
@@ -296,9 +478,16 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         OnPropertyChanged(nameof(CanSend));
         OnPropertyChanged(nameof(CanCancel));
         OnPropertyChanged(nameof(CanSwitchConversation));
+        OnPropertyChanged(nameof(CanOptimize));
     }
 
-    partial void OnInputTextChanged(string value) => OnPropertyChanged(nameof(CanSend));
+    partial void OnIsOptimizingChanged(bool value) => OnPropertyChanged(nameof(CanOptimize));
+
+    partial void OnInputTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(CanSend));
+        OnPropertyChanged(nameof(CanOptimize));
+    }
 
     partial void OnSelectedConversationChanged(AiConversation? value)
     {
@@ -308,6 +497,9 @@ public sealed partial class AiOfficeViewModel : ObservableObject
             _settings.LastConversationId = value.Id;
             _store.SaveSettings(_settings);
         }
+
+        // 工作区是按会话隔离的，切换会话后工具目录也得跟着换
+        _tools = CreateTools();
 
         Messages.Clear();
         _history = new List<AiMessage>();
@@ -388,7 +580,7 @@ public sealed partial class AiOfficeViewModel : ObservableObject
 
         // 权限变了就把「本次会话都允许」作废，重新按新权限确认
         _writesApprovedForSession = false;
-        _tools = new AiFileTools(_settings, ConfirmWriteAsync);
+        _tools = CreateTools();
         _store.SaveSettings(_settings);
         UpdateStatusTexts();
 
@@ -507,7 +699,7 @@ public sealed partial class AiOfficeViewModel : ObservableObject
 
         WorkspacePath = dialog.FolderName;
         _settings.WorkspaceDirectory = dialog.FolderName;
-        _tools = new AiFileTools(_settings, ConfirmWriteAsync);
+        _tools = CreateTools();
         _store.SaveSettings(_settings);
         UpdateStatusTexts();
         _shell.ShowToast("工作区已设置", dialog.FolderName, ControlAppearance.Success);
