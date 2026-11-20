@@ -1,14 +1,14 @@
 {
-  "version": "0.53",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.53/ClassManager.App.exe",
-  "size": 82916041,
-  "sha256": "5208056152f7cc4ad32f8e55d2534619db8a5eb920005ccfe621132fade8d402",
-  "notes": "fix: PDF 页切走不再重置进度；凭据扩到 6 key；主模型配额耗尽自动换 fallback 模型（34s→1.1s）",
+  "version": "0.54",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe",
+  "size": 82925257,
+  "sha256": "9fdedb610de5c3f18e5aec7734178b10b0dab6d277512543935e35e203bff9f9",
+  "notes": "feat(AI办公): 模型徽标/提示词优化/Ctrl+Enter换行/工作区按会话隔离/联网搜索；危险脚本执行前确认",
   "publishedAt": "2026-11-20",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.53/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.53/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.53/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
