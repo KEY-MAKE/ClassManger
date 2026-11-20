@@ -136,6 +136,15 @@ public sealed class AiFileTools
         },
         new()
         {
+            Name = "web_search",
+            Description = "联网搜索（走国内可访问的必应）。返回若干条「标题 + 链接 + 摘要」。"
+                        + "遇到需要查资料、查最新信息、不确定答案的场景，先用它搜，不要凭记忆编。",
+            ParametersJson = """
+            {"type":"object","properties":{"query":{"type":"string","description":"搜索关键词，用自然语言或短句都行"}},"required":["query"]}
+            """,
+        },
+        new()
+        {
             Name = "web_fetch",
             Description = "联网抓取网址并返回正文文本（HTML 自动转纯文本）。参数：url 完整地址（http/https）。",
             ParametersJson = """
@@ -178,6 +187,7 @@ public sealed class AiFileTools
                 "write_xlsx" => await WriteXlsxAsync(rawPath, args?["sheets"], ct).ConfigureAwait(false),
                 "write_docx" => await WriteOfficeAsync(rawPath, args?["content"]?.GetValue<string>() ?? string.Empty, "docx", ct).ConfigureAwait(false),
                 "write_pptx" => await WriteOfficeAsync(rawPath, args?["content"]?.GetValue<string>() ?? string.Empty, "pptx", ct).ConfigureAwait(false),
+                "web_search" => await WebSearchAsync(args?["query"]?.GetValue<string>() ?? string.Empty, ct).ConfigureAwait(false),
                 "web_fetch" => await FetchWebAsync(args?["url"]?.GetValue<string>() ?? string.Empty, ct).ConfigureAwait(false),
                 "search_tool" => await SearchToolAsync(args?["query"]?.GetValue<string>() ?? string.Empty, ct).ConfigureAwait(false),
                 "install_tool" => await InstallToolAsync(
@@ -396,6 +406,154 @@ public sealed class AiFileTools
     }
 
     /// <summary>联网抓取网页并返回可读文本。</summary>
+    /// <summary>
+    /// 联网搜索。走 cn.bing.com（国内可直连），解析结果页里的标题/链接/摘要。
+    /// <para>
+    /// 没有接第三方搜索 API（要钱、要 key），直接用结果页 —— 够模型判断"去哪看"了；
+    /// 需要正文再让它调 web_fetch。
+    /// </para>
+    /// </summary>
+    private async Task<string> WebSearchAsync(string query, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return "query 不能为空。";
+        }
+
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                + "(KHTML, like Gecko) Chrome/120.0 Safari/537.36");
+
+            client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml");
+
+            var url = "https://cn.bing.com/search?q=" + Uri.EscapeDataString(query) + "&setlang=zh-CN";
+            var html = await client.GetStringAsync(url, ct).ConfigureAwait(false);
+
+            var results = ParseBingResults(html);
+
+            if (results.Count == 0)
+            {
+                // 页面结构变了或者被拦：退回纯文本，至少别让模型瞎猜
+                var fallback = HtmlToText(html);
+
+                return string.IsNullOrWhiteSpace(fallback)
+                    ? $"没搜到结果（关键词：{query}）。"
+                    : $"没解析出结构化结果，页面正文如下（关键词：{query}）：\n" + Truncate(fallback, 1500);
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"搜索「{query}」找到 {results.Count} 条：");
+            sb.AppendLine();
+
+            for (var i = 0; i < results.Count; i++)
+            {
+                var (title, link, snippet) = results[i];
+                sb.AppendLine($"{i + 1}. {title}");
+                sb.AppendLine($"   {link}");
+
+                if (!string.IsNullOrWhiteSpace(snippet))
+                {
+                    sb.AppendLine($"   {Truncate(snippet, 220)}");
+                }
+
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("需要某条详情就用 web_fetch 抓它的链接。");
+            return sb.ToString();
+        }
+        catch (OperationCanceledException)
+        {
+            return "搜索被取消。";
+        }
+        catch (Exception ex)
+        {
+            return $"搜索失败：{ex.Message}";
+        }
+    }
+
+    /// <summary>从必应结果页里抽出「标题 / 链接 / 摘要」。</summary>
+    private static List<(string Title, string Link, string Snippet)> ParseBingResults(string html)
+    {
+        var results = new List<(string, string, string)>();
+
+        try
+        {
+            var blocks = System.Text.RegularExpressions.Regex.Matches(
+                html,
+                @"<li[^>]*class=""[^""]*b_algo[^""]*""[\s\S]*?</li>",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            foreach (System.Text.RegularExpressions.Match block in blocks)
+            {
+                var chunk = block.Value;
+
+                var linkMatch = System.Text.RegularExpressions.Regex.Match(
+                    chunk,
+                    @"<h2[^>]*>[\s\S]*?<a[^>]+href=""(https?://[^""]+)""[^>]*>([\s\S]*?)</a>",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (!linkMatch.Success)
+                {
+                    continue;
+                }
+
+                var link = linkMatch.Groups[1].Value;
+                var title = StripTags(linkMatch.Groups[2].Value);
+
+                var snippetMatch = System.Text.RegularExpressions.Regex.Match(
+                    chunk,
+                    @"<p[^>]*>([\s\S]*?)</p>",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                var snippet = snippetMatch.Success ? StripTags(snippetMatch.Groups[1].Value) : string.Empty;
+
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    continue;
+                }
+
+                results.Add((title, link, snippet));
+
+                if (results.Count >= 8)
+                {
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            // 解析崩了当没解析到
+        }
+
+        return results;
+    }
+
+    /// <summary>去掉 HTML 标签和常见实体。</summary>
+    private static string StripTags(string html)
+    {
+        if (string.IsNullOrEmpty(html))
+        {
+            return string.Empty;
+        }
+
+        var text = System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", string.Empty);
+
+        text = text
+            .Replace("&nbsp;", " ")
+            .Replace("&amp;", "&")
+            .Replace("&lt;", "<")
+            .Replace("&gt;", ">")
+            .Replace("&quot;", "\"")
+            .Replace("&#39;", "'");
+
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+    }
+
     private async Task<string> FetchWebAsync(string url, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(url))
@@ -487,6 +645,17 @@ public sealed class AiFileTools
 
     /// <summary>执行 Python 脚本。</summary>
     /// <summary>
+    /// 看起来会「删东西」的脚本特征。
+    /// <para>
+    /// 有过真实教训：AI 生成的清理脚本删错了目录，用户的下载文件夹（9GB）没了。
+    /// 所以带删除语义的脚本必须先让用户看到代码再执行。
+    /// </para>
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex DestructiveScript =
+        new(@"rmtree|os\.remove|os\.unlink|shutil\.rm|rmdir|\.unlink\(|Remove-Item|del\s+[/-]|format\s+[a-z]:",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
     /// PDF → Word。算法上走 pdf2docx（离线、不联网），
     /// 转换完把结果路径交给模型，需要修结构时它再自己用 read_file / write_docx 处理。
     /// </summary>
@@ -555,6 +724,24 @@ public sealed class AiFileTools
                 return "运行 Python 失败：本机没有 Python 环境，自动安装也没成功。\n"
                        + install.Message
                        + "\n请改用不依赖 Python 的方式完成任务。";
+            }
+        }
+
+        // 带删除语义的脚本：先把代码给用户看，确认了再跑
+        if (DestructiveScript.IsMatch(code))
+        {
+            var approved = await _confirmWrite(new AiWriteRequest
+            {
+                FullPath = "（执行 Python 脚本）",
+                Content = "这段脚本里包含删除/删除目录操作，请确认后才会执行：\n\n"
+                          + (code.Length > 3000 ? code[..3000] + "\n…（后略）" : code),
+                IsNewFile = true,
+                ExistingLength = 0,
+            }).ConfigureAwait(false);
+
+            if (!approved)
+            {
+                return "用户拒绝了这次脚本执行。请换一种不删除文件的做法，或先问清楚用户想保留什么。";
             }
         }
 

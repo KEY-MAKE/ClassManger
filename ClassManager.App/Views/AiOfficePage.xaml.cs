@@ -144,8 +144,9 @@ public partial class AiOfficePage : Page
             return;
         }
 
-        // Shift+Enter 走默认行为（换行）
-        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        // Shift+Enter / Ctrl+Enter 都走默认行为（换行）
+        // 写长段落时 Shift 按着别扭，Ctrl+Enter 是常见习惯
+        if ((Keyboard.Modifiers & (ModifierKeys.Shift | ModifierKeys.Control)) != 0)
         {
             return;
         }

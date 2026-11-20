@@ -67,6 +67,12 @@ public interface IAiChatService
     /// <summary>当前使用的 key 标签（api1 / api2）。</summary>
     string ActiveKeyLabel { get; }
 
+    /// <summary>最近一次成功调用实际用的模型。</summary>
+    string LastUsedModel { get; }
+
+    /// <summary>配置里的首选模型（界面上「当前模型」初始显示它）。</summary>
+    string PrimaryModel { get; }
+
     /// <summary>本次运行累计用量。</summary>
     AiUsageTotals SessionUsage { get; }
 
@@ -131,6 +137,12 @@ public sealed class AiChatService : IAiChatService
     /// <inheritdoc />
     public string ActiveKeyLabel => $"api{_activeKeyIndex + 1}";
 
+    /// <summary>最近一次成功调用实际用的模型（主模型配额耗尽时会变成 fallback 那个）。</summary>
+    public string LastUsedModel { get; private set; } = string.Empty;
+
+    /// <inheritdoc />
+    public string PrimaryModel => _credentials.Model;
+
     /// <inheritdoc />
     public AiUsageTotals SessionUsage { get; } = new();
 
@@ -180,6 +192,7 @@ public sealed class AiChatService : IAiChatService
 
             if (outcome is not null)
             {
+                LastUsedModel = model;
                 return outcome;
             }
 
@@ -348,6 +361,7 @@ public sealed class AiChatService : IAiChatService
                 - write_docx：生成 Word（内容用 Markdown 写）
                 - write_pptx：生成 PPT（内容用 Markdown 写，每行 # 标题一页）
                 - create_directory：创建目录（可以一次建多级）
+                - web_search：联网搜索（必应），返回「标题 + 链接 + 摘要」。需要查资料先用它
                 - web_fetch：抓取网页正文
                 - search_tool：联网检索可用的库/工具（查 PyPI + 网页搜索）
                 - pdf_to_word：把 PDF 转成 Word（纯离线，文件不上传）。用户要「PDF 转 Word」时直接用它，
@@ -366,6 +380,19 @@ public sealed class AiChatService : IAiChatService
                 - 只输出给用户看的内容。你的思考过程不要写出来。
                 - 不要输出任何形如 <result>、｜DSML｜ 的内部标记，那类内容会被系统剥掉并让对话出错。
                 - 每一轮都要么给出可读的回答，要么发起工具调用，不要两样都不给。
+
+                主动联网（重要）：
+                你的记忆可能过时，遇到下面这些情况**先用 web_search 查，不要凭印象编**：
+                - 用户问「最新 / 现在 / 推荐哪个」这类问题（软件版本、价格、政策、教程）
+                - 你不确定的事实（命令参数、报错含义、某个工具怎么用）
+                - 用户提出操作类需求（「帮我清理磁盘」「优化开机速度」「找出占空间的文件」）——
+                  先搜当前 Windows 的正确做法和要避开的坑，再动手，不要凭想象直接写脚本。
+                搜到结果后，需要细节再用 web_fetch 打开具体页面。
+
+                涉及删除文件时要格外小心：
+                - 先列清单让用户看清楚要删什么，别直接删；
+                - 带删除操作的脚本会先弹确认框给用户过目（这是设计如此，不是你出错了）；
+                - 永远不要删系统目录、用户主目录、桌面、下载、文档这些地方。
 
                 工作方式：
                 1. 需要动手就调工具，不要只描述步骤。
