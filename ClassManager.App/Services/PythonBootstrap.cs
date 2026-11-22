@@ -22,13 +22,21 @@ public static class PythonBootstrap
     /// <summary>要装的版本。</summary>
     private const string Version = "3.12.10";
 
-    /// <summary>清华镜像上的安装包（国内下载快）。</summary>
-    private const string InstallerUrl =
-        "https://mirrors.tuna.tsinghua.edu.cn/python/3.12.10/python-3.12.10-amd64.exe";
-
-    /// <summary>镜像挂了时回退官方站。</summary>
-    private const string FallbackInstallerUrl =
-        "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe";
+    /// <summary>
+    /// 安装包候选地址（国内优先，逐个试）。
+    /// <para>
+    /// 实测 2026-11：阿里云、中科大都有完整安装包（25.7MB）；清华对 HEAD 请求返回 403，
+    /// 华为云当前 502 —— 所以这两个排在后面，别当主选。
+    /// </para>
+    /// </summary>
+    private static readonly string[] InstallerUrls =
+    {
+        "https://mirrors.aliyun.com/python-release/windows/python-3.12.10-amd64.exe",
+        "https://mirrors.ustc.edu.cn/python/3.12.10/python-3.12.10-amd64.exe",
+        "https://mirrors.tuna.tsinghua.edu.cn/python/3.12.10/python-3.12.10-amd64.exe",
+        "https://mirrors.huaweicloud.com/python/3.12.10/python-3.12.10-amd64.exe",
+        "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe",
+    };
 
     /// <summary>下载超时。</summary>
     private static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(10);
@@ -102,7 +110,11 @@ public static class PythonBootstrap
                     true);
             }
 
-            return new InstallResult(true, "Python 安装完成。", installed, true);
+            // 装完顺手把 pip 全局源配成国内镜像 —— 之后用户在任何地方跑 pip 都快，
+            // 不用再记 -i 参数（老师更不可能记这个）。
+            PackageMirrors.ConfigureGlobalPipIndex();
+
+            return new InstallResult(true, "Python 安装完成，pip 已配置国内镜像源。", installed, true);
         }
         catch (OperationCanceledException)
         {
@@ -136,7 +148,7 @@ public static class PythonBootstrap
 
         var errors = new List<string>();
 
-        foreach (var url in new[] { InstallerUrl, FallbackInstallerUrl })
+        foreach (var url in InstallerUrls)
         {
             ct.ThrowIfCancellationRequested();
 
