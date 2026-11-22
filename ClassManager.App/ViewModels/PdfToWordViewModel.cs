@@ -186,7 +186,7 @@ public sealed partial class PdfToWordViewModel : ObservableObject
             // ③ AI 整理段落结构（默认开）
             if (UseAiCleanup)
             {
-                await CleanupWithAiAsync(produced).ConfigureAwait(true);
+                await CleanupWithAiAsync(PdfPath, produced).ConfigureAwait(true);
             }
 
             try
@@ -249,40 +249,63 @@ public sealed partial class PdfToWordViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 用 AI 按《试卷格式规范》重新分段，另存为「原名_AI整理.docx」。
-    /// <para>不覆盖原始转换结果 —— 万一 AI 整理得不如原样，用户还有原稿。</para>
+    /// 用 AI 校对转换结果。
+    /// <para>
+    /// <b>不再套用《试卷格式规范》</b> —— PDF 转 Word 不一定是为了做课件，
+    /// 也不一定转的是试卷。规范只管评讲课件那条线。
+    /// </para>
+    /// <para>
+    /// 这里做的事：拿 PDF 原本的文本当基准，和 pdf2docx 的输出逐段对比，
+    /// 修掉乱码、合并过头/拆断的段落、丢失的字，另存为「原名_AI校对.docx」。
+    /// </para>
     /// </summary>
-    private async Task CleanupWithAiAsync(string docxPath)
+    private async Task CleanupWithAiAsync(string pdfPath, string docxPath)
     {
         try
         {
-            StatusText = "正在用 AI 整理段落结构…";
-            AppendLog("开始 AI 整理（按《试卷格式规范》重排段落）…");
+            StatusText = "正在用 AI 校对排版…";
+            AppendLog("开始 AI 校对（拿原 PDF 文本做基准，修排版和乱码）…");
 
-            // 1) 读出转换后的正文
+            // 1) 需要能跑 PyMuPDF 的 Python
+            var python = await PythonBootstrap.EnsureAsync(null, CancellationToken.None)
+                .ConfigureAwait(true);
+
+            if (!python.Ok || python.PythonPath is null)
+            {
+                AppendLog("✗ 没有可用的 Python，跳过 AI 校对：" + python.Message);
+                return;
+            }
+
+            // 2) 提取原 PDF 的纯文本
+            AppendLog("正在提取原 PDF 文本…");
+            var original = await _service
+                .ExtractPdfTextAsync(pdfPath, python.PythonPath, CancellationToken.None)
+                .ConfigureAwait(true);
+
+            if (string.IsNullOrWhiteSpace(original))
+            {
+                AppendLog("✗ 提取不到 PDF 文本（可能是扫描件，没有文本层），跳过 AI 校对");
+                StatusText = "扫描件无法校对（没有文本层）";
+                return;
+            }
+
+            AppendLog($"原 PDF 提取到 {original.Length} 字");
+
+            // 3) 读转换后的 docx 正文
             var read = AiDocumentReader.Read(docxPath);
 
             if (!read.Ok || string.IsNullOrWhiteSpace(read.Text))
             {
-                AppendLog("✗ 读不出文档正文，跳过 AI 整理：" + read.Text);
+                AppendLog("✗ 读不出转换后的正文，跳过校对：" + read.Text);
                 return;
             }
 
-            AppendLog($"已读取正文 {read.Text.Length} 字");
+            AppendLog($"转换后正文 {read.Text.Length} 字");
 
-            // 2) 取内置规范（工作区里那份，由 AI 办公页释放）
-            var spec = ReadExamSpec();
-
-            if (string.IsNullOrWhiteSpace(spec))
-            {
-                AppendLog("（没找到《试卷格式规范.md》，按通用规则整理）");
-            }
-
-            // 3) 调模型
+            // 4) 让模型对比修正
             var history = new List<AiMessage>
             {
-                new() { Role = "system", Content = BuildCleanupPrompt(spec) },
-                new() { Role = "user", Content = read.Text },
+                new() { Role = "user", Content = BuildComparePrompt(original, read.Text) },
             };
 
             var reply = await AppServices.Ai
@@ -291,46 +314,42 @@ public sealed partial class PdfToWordViewModel : ObservableObject
 
             if (!reply.Ok || string.IsNullOrWhiteSpace(reply.Content))
             {
-                // ReasoningOnly = 模型只吐了「思考过程」，正文是空的
-                // （推理型模型遇到长输入时，token 全被思考吃掉）。
                 var why = reply.ReasoningOnly
-                    ? "模型只输出了思考过程、没给正文（长规范+长正文时容易发生）。"
-                      + "原稿已保留，稍后重试或取消勾选「AI 整理」先要原稿。"
+                    ? "模型只输出了思考过程、没给正文。原稿已保留，稍后重试即可。"
                     : (reply.Error ?? "模型没有返回内容");
 
-                AppendLog("✗ AI 整理失败：" + why);
-                StatusText = "AI 整理没成功（原稿已生成）";
+                AppendLog("✗ AI 校对失败：" + why);
+                StatusText = "AI 校对没成功（原稿已生成）";
                 return;
             }
 
-            AppendLog($"AI 返回 {reply.Content.Length} 字，正在生成新文档…");
+            AppendLog($"AI 返回 {reply.Content.Length} 字，正在生成校对版…");
 
-            // 4) 写回（另存，不覆盖原稿）
-            var engineRoot = AppServices.Exam2Ppt.EngineRoot;
-            var ok = await AppServices.Exam2Ppt
+            // 5) 写回（另存，不覆盖原稿）
+            var engineReady = await AppServices.Exam2Ppt
                 .EnsureEngineAsync(null, CancellationToken.None)
                 .ConfigureAwait(true);
 
-            if (!ok)
+            if (!engineReady)
             {
-                AppendLog("✗ 文档引擎不可用，AI 整理结果未写成 docx");
+                AppendLog("✗ 文档引擎不可用，AI 校对结果未写成 docx");
                 return;
             }
 
             var cleanedPath = Path.Combine(
                 Path.GetDirectoryName(docxPath) ?? string.Empty,
-                Path.GetFileNameWithoutExtension(docxPath) + "_AI整理.docx");
+                Path.GetFileNameWithoutExtension(docxPath) + "_AI校对.docx");
 
             var write = await OfficeWriter
-                .WriteDocxAsync(engineRoot, reply.Content, cleanedPath, CancellationToken.None)
+                .WriteDocxAsync(AppServices.Exam2Ppt.EngineRoot, reply.Content, cleanedPath, CancellationToken.None)
                 .ConfigureAwait(true);
 
             if (File.Exists(cleanedPath))
             {
                 OutputFileText = cleanedPath;
-                StatusText = "转换 + AI 整理完成";
-                AppendLog("✓ 已生成整理版：" + cleanedPath);
-                AppendLog("（原稿保留在同目录，文件名不带 _AI整理）");
+                StatusText = "转换 + AI 校对完成";
+                AppendLog("✓ 已生成校对版：" + cleanedPath);
+                AppendLog("（原稿保留在同目录，文件名不带 _AI校对）");
             }
             else
             {
@@ -339,81 +358,44 @@ public sealed partial class PdfToWordViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            AppendLog("✗ AI 整理出错：" + ex.Message);
+            AppendLog("✗ AI 校对出错：" + ex.Message);
         }
     }
 
-    /// <summary>读工作区里的《试卷格式规范.md》。</summary>
-    private string ReadExamSpec()
-    {
-        // 依次尝试：设置里的工作区 → 默认工作区（Documents\ClassManager AI）→ 两个都找一遍
-        var candidates = new List<string>();
-
-        try
-        {
-            var configured = AppServices.AiStore.LoadSettings().WorkspaceDirectory;
-
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                candidates.Add(configured);
-            }
-        }
-        catch
-        {
-            // 设置读不出来就靠默认值
-        }
-
-        candidates.Add(AiSettings.DefaultWorkspace);
-
-        foreach (var workspace in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var path = Path.Combine(workspace, "试卷格式规范.md");
-
-                if (File.Exists(path))
-                {
-                    Logs.Add($"[{DateTime.Now:HH:mm:ss}] 已读到规范：{path}");
-                    return File.ReadAllText(path);
-                }
-
-                Logs.Add($"[{DateTime.Now:HH:mm:ss}] 这个位置没有规范：{path}");
-            }
-            catch
-            {
-                // 换下一个候选
-            }
-        }
-
-        return string.Empty;
-    }
-
-    /// <summary>整理提示词。</summary>
-    private static string BuildCleanupPrompt(string spec)
+    /// <summary>校对提示词：以原 PDF 文本为基准，修转换稿的排版和乱码。</summary>
+    private static string BuildComparePrompt(string original, string converted)
     {
         var sb = new System.Text.StringBuilder();
 
-        sb.AppendLine("你是试卷排版助手。下面这份文本是从 PDF 转换来的 Word 正文，");
-        sb.AppendLine("转换工具按视觉位置聚类，把多行合并成了同一个段落。");
+        sb.AppendLine("你是文档校对助手。下面两份内容来自同一个 PDF：");
         sb.AppendLine();
-        sb.AppendLine("任务：重新分段，还原成一份结构清晰的试卷。要求：");
-        sb.AppendLine("1. 每个大题的题干（如「一、单选题」）单独成段，用 `## ` 开头；");
-        sb.AppendLine("2. 每个小题单独成段，题号与题干在同一行；");
-        sb.AppendLine("3. 选项 A/B/C/D 单独成行或用列表，不要挤在题干里；");
-        sb.AppendLine("4. **不要改写、不要增删任何题目内容和数字** —— 你只负责分段和层级；");
-        sb.AppendLine("5. 用 Markdown 输出：`##` 大题、普通段落小题、`-` 选项。");
-        sb.AppendLine("6. 只输出 Markdown 正文，不要任何解释、前后缀或代码块标记。");
+        sb.AppendLine("【原件】用 PDF 阅读器直接提取的纯文本（按页，保留原始换行，可能有页眉页脚）");
+        sb.AppendLine("【转换稿】pdf2docx 转成 Word 后的正文（常见问题：段落合并过头、拆断、乱码、丢字）");
         sb.AppendLine();
-
-        if (!string.IsNullOrWhiteSpace(spec))
-        {
-            sb.AppendLine("下面是这份试卷必须遵守的格式规范（用户提供的标准），请严格对齐：");
-            sb.AppendLine();
-            sb.AppendLine(spec);
-        }
+        sb.AppendLine("任务：**以【原件】为准**，修正【转换稿】，输出一份干净、可直接编辑的正文。");
+        sb.AppendLine();
+        sb.AppendLine("规则：");
+        sb.AppendLine("1. **内容必须与原件一致** —— 不能增、不能删、不能改写题目和数字；");
+        sb.AppendLine("2. **修乱码**：Ã、ï¿½、□、★、重复字符、明显不该出现的符号；");
+        sb.AppendLine("3. **还原段落**：原件里一行一行的短行，合并成语义完整的段落；");
+        sb.AppendLine("   原文有明显编号（一、二、1. 2.）、缩进或空行的，按它原本的层级分段；");
+        sb.AppendLine("4. **不要套用任何「试卷格式规范」** —— 这份文档可能不是试卷，");
+        sb.AppendLine("   按它本来的结构整理就行，不要硬套题号/选项格式；");
+        sb.AppendLine("5. 用 Markdown 输出：标题用 `#`，普通段落直接写，列表用 `-`；");
+        sb.AppendLine("6. 只输出整理后的正文，不要解释、不要前后缀、不要代码块标记。");
+        sb.AppendLine();
+        sb.AppendLine("===== 【原件】 =====");
+        sb.AppendLine(Truncate(original, 24000));
+        sb.AppendLine();
+        sb.AppendLine("===== 【转换稿】 =====");
+        sb.AppendLine(Truncate(converted, 24000));
 
         return sb.ToString();
     }
+
+    /// <summary>截断超长文本，避免一次塞爆上下文。</summary>
+    private static string Truncate(string text, int max) =>
+        text.Length <= max ? text : text[..max] + "\n…（后略）";
 
     private void AppendLog(string message)
     {

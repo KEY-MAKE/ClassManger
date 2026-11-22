@@ -116,6 +116,17 @@
                 <Border Style="{StaticResource ControlPanel}">
                     <StackPanel>
                         <TextBlock Text="③ 生成内容" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <CheckBox Content="生成前用 AI 按规范整理试卷（推荐）"
+                                  IsChecked="{Binding UseAiNormalize}"
+                                  Margin="0,0,0,4" />
+
+                        <TextBlock Text="自动把题号、选项、答案标记改成引擎认得的写法；只调格式，不改题目内容。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+
                         <CheckBox Content="生成阅读材料页" IsChecked="{Binding GenerateMaterial}" Margin="0,0,0,6" />
                         <CheckBox Content="生成【导语】页" IsChecked="{Binding GenerateGuide}" Margin="0,0,0,6" />
                         <CheckBox Content="答案面板写【解析】" IsChecked="{Binding WriteAnalysis}" Margin="0,0,0,6" />

@@ -137,6 +137,34 @@ public sealed class PdfToWordService
             python.InstalledNow || installedNow);
     }
 
+    /// <summary>
+    /// 用 PyMuPDF 把 PDF 的纯文本按页提取出来。
+    /// <para>
+    /// 用途：给 AI 当「原件」基准 —— 转换后的 Word 丢了什么字、乱码在哪，
+    /// 都得拿原 PDF 的文字来对。PDF 自带文本层时不走 OCR，快且准。
+    /// </para>
+    /// </summary>
+    public async Task<string> ExtractPdfTextAsync(
+        string pdfPath,
+        string pythonExe,
+        CancellationToken ct = default)
+    {
+        var script =
+            "import pymupdf\n" +
+            $"doc = pymupdf.open({ToPyLiteral(pdfPath)})\n" +
+            "try://n" +
+            "    for i, page in enumerate(doc, 1):\n" +
+            "        print(f'=== 第 {i} 页 ===')\n" +
+            "        print(page.get_text('text'))\n" +
+            "finally://n" +
+            "    doc.close()\n";
+
+        var run = await RunPythonAsync(pythonExe, script, TimeSpan.FromMinutes(5), ct)
+            .ConfigureAwait(false);
+
+        return run.Ok ? run.Output : string.Empty;
+    }
+
     /// <summary>检查某个 Python 模块能不能 import。</summary>
     private static async Task<bool> HasModuleAsync(string python, string module, CancellationToken ct)
     {
