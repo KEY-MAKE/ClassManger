@@ -32,6 +32,10 @@ public sealed partial class PdfToWordViewModel : ObservableObject
         {
             OutputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
+
+        // 进来就探一次高质量引擎状态：装了就显示勾选框，没装就显示预下载按钮。
+        // 少了这一行，界面会一直停在「未安装」的初始值上。
+        RefreshMineruState();
     }
 
     [ObservableProperty]
@@ -121,7 +125,7 @@ public sealed partial class PdfToWordViewModel : ObservableObject
         OnPropertyChanged(nameof(CanUseHighQuality));
     }
 
-    public bool CanDownloadMineru => !IsDownloadingMineru && !IsBusy;
+    public bool CanDownloadMineru => !IsDownloadingMineru && !IsBusy && !IsMineruReady;
 
     public bool CanUseHighQuality => IsMineruReady && !IsBusy;
 

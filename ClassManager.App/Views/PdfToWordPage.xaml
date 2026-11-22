@@ -79,20 +79,19 @@
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    TextWrapping="Wrap" />
 
-                        <!-- 未安装：给个预下载入口，老师不急着用可以慢慢下 -->
+                        <!-- 两个控件都常驻，靠 IsEnabled 区分可用态：
+                             之前用 Visibility + ConverterParameter=Invert 控制，实测那套组合
+                             在某些主题资源里不生效，整块会「消失」。常驻最稳。 -->
                         <ui:Button Content="预下载高质量模式（约 0.8GB）"
                                    Margin="0,10,0,0"
                                    HorizontalAlignment="Stretch"
                                    Command="{Binding DownloadMineruCommand}"
-                                   IsEnabled="{Binding CanDownloadMineru}"
-                                   Visibility="{Binding IsMineruReady, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}" />
+                                   IsEnabled="{Binding CanDownloadMineru}" />
 
-                        <!-- 已安装：显示开关 -->
                         <CheckBox Content="使用高质量解析（表格 / 公式更准，CPU 上每页几秒）"
-                                  Margin="0,10,0,0"
+                                  Margin="0,8,0,0"
                                   IsChecked="{Binding UseHighQuality}"
-                                  IsEnabled="{Binding CanUseHighQuality}"
-                                  Visibility="{Binding IsMineruReady, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                  IsEnabled="{Binding CanUseHighQuality}" />
                     </StackPanel>
                 </Border>
 
