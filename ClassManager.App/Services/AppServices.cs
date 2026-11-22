@@ -46,6 +46,9 @@ public static class AppServices
     /// </summary>
     public static UpdateDownloadManager UpdateDownload { get; private set; } = null!;
 
+    /// <summary>可选的高质量 PDF 解析引擎（MinerU）。未安装时为 null 状态，功能自动降级。</summary>
+    public static MineruService Mineru { get; private set; } = null!;
+
     public static NavigationPageProvider PageProvider { get; private set; } = null!;
 
     /// <summary>是否已完成装配。</summary>
@@ -85,6 +88,7 @@ public static class AppServices
         AiStore = new AiStore();
         Update = new UpdateService();
         UpdateDownload = new UpdateDownloadManager(Update);
+        Mineru = new MineruService();
         PageProvider = new NavigationPageProvider();
 
         IsInitialized = true;

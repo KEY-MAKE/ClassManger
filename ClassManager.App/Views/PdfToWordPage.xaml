@@ -69,10 +69,37 @@
                     </StackPanel>
                 </Border>
 
-                <!-- ③ 操作 -->
+                <!-- ③ 高质量解析（可选） -->
                 <Border Style="{StaticResource ControlPanel}">
                     <StackPanel>
-                        <TextBlock Text="③ 开始转换" Style="{StaticResource SectionHeaderTextStyle}" />
+                        <TextBlock Text="③ 高质量解析（可选）" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <TextBlock Text="{Binding MineruStatusText}"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" />
+
+                        <!-- 未安装：给个预下载入口，老师不急着用可以慢慢下 -->
+                        <ui:Button Content="预下载高质量模式（约 0.8GB）"
+                                   Margin="0,10,0,0"
+                                   HorizontalAlignment="Stretch"
+                                   Command="{Binding DownloadMineruCommand}"
+                                   IsEnabled="{Binding CanDownloadMineru}"
+                                   Visibility="{Binding IsMineruReady, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}" />
+
+                        <!-- 已安装：显示开关 -->
+                        <CheckBox Content="使用高质量解析（表格 / 公式更准，CPU 上每页几秒）"
+                                  Margin="0,10,0,0"
+                                  IsChecked="{Binding UseHighQuality}"
+                                  IsEnabled="{Binding CanUseHighQuality}"
+                                  Visibility="{Binding IsMineruReady, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ④ 操作 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="④ 开始转换" Style="{StaticResource SectionHeaderTextStyle}" />
 
                         <CheckBox Content="转换后用 AI 整理段落结构"
                                   IsChecked="{Binding UseAiCleanup}"

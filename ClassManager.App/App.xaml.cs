@@ -178,6 +178,12 @@ public partial class App : Application
 
         // 启动时静默检查更新（可在「关于 → 更新源设置」里关闭）
         _ = viewModel.CheckUpdateOnStartupAsync();
+
+        // 高质量 PDF 引擎没装的话提示一句（延迟几秒，避开更新提示）
+        _ = Task.Delay(TimeSpan.FromSeconds(4))
+            .ContinueWith(
+                _ => viewModel.PromptMineruIfNotInstalled(),
+                TaskScheduler.FromCurrentSynchronizationContext());
     }
 
     private void ShowInstallWizard()
