@@ -1,14 +1,14 @@
 {
-  "version": "0.55",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe",
-  "size": 82931913,
-  "sha256": "50a85d6ab34a7a9594f4cbcbc300ed9d3131132816ea7b979426c94de6af0b75",
-  "notes": "feat: PDF转Word改为对比原PDF修排版乱码(不再套试卷规范)；评讲课件内置AI按规范自动整理试卷",
+  "version": "0.58",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.58/ClassManager.App.exe",
+  "size": 82948297,
+  "sha256": "833eff319b40fe88f5c222247a91181d3f61c400e3fb9a7db410badddba1eed6",
+  "notes": "feat: pip 多镜像自动轮换（阿里云→中科大→腾讯云→清华→官方）；Python 安装包多镜像；装完自动配置 pip 全局源",
   "publishedAt": "2026-11-22",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.58/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.58/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.58/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
