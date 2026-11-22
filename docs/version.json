@@ -1,14 +1,14 @@
 {
-  "version": "0.54",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe",
-  "size": 82925257,
-  "sha256": "9fdedb610de5c3f18e5aec7734178b10b0dab6d277512543935e35e203bff9f9",
-  "notes": "feat(AI办公): 模型徽标/提示词优化/Ctrl+Enter换行/工作区按会话隔离/联网搜索；危险脚本执行前确认",
-  "publishedAt": "2026-11-20",
+  "version": "0.55",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe",
+  "size": 82931913,
+  "sha256": "50a85d6ab34a7a9594f4cbcbc300ed9d3131132816ea7b979426c94de6af0b75",
+  "notes": "feat: PDF转Word改为对比原PDF修排版乱码(不再套试卷规范)；评讲课件内置AI按规范自动整理试卷",
+  "publishedAt": "2026-11-22",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.54/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.55/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
