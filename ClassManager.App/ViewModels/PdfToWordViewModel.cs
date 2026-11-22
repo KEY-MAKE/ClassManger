@@ -32,6 +32,10 @@ public sealed partial class PdfToWordViewModel : ObservableObject
         {
             OutputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
+
+        // 进来就探一次高质量引擎状态：装了就显示勾选框，没装就显示预下载按钮。
+        // 少了这一行，界面会一直停在「未安装」的初始值上。
+        RefreshMineruState();
     }
 
     [ObservableProperty]
@@ -46,6 +50,22 @@ public sealed partial class PdfToWordViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isBusy;
+
+    /// <summary>是否使用 MinerU 高质量解析（需要先装，未装时自动退回 pdf2docx）。</summary>
+    [ObservableProperty]
+    private bool _useHighQuality;
+
+    /// <summary>高质量引擎是否就绪。</summary>
+    [ObservableProperty]
+    private bool _isMineruReady;
+
+    /// <summary>高质量引擎的状态说明。</summary>
+    [ObservableProperty]
+    private string _mineruStatusText = "高质量模式未安装";
+
+    /// <summary>是否正在下载高质量引擎。</summary>
+    [ObservableProperty]
+    private bool _isDownloadingMineru;
 
     [ObservableProperty]
     private string _outputFileText = string.Empty;
@@ -76,6 +96,97 @@ public sealed partial class PdfToWordViewModel : ObservableObject
     partial void OnPdfPathChanged(string value) => OnPropertyChanged(nameof(CanStart));
 
     partial void OnOutputFileTextChanged(string value) => OnPropertyChanged(nameof(HasResult));
+
+    /// <summary>刷新高质量引擎的可用状态。</summary>
+    private void RefreshMineruState()
+    {
+        try
+        {
+            IsMineruReady = AppServices.Mineru.IsInstalled;
+
+            if (IsMineruReady)
+            {
+                MineruStatusText = "高质量模式已就绪（MinerU，表格/公式更准）";
+                UseHighQuality = true;
+            }
+            else
+            {
+                MineruStatusText = "高质量模式未安装（约 0.8GB，下载后可显著提升表格与公式的还原度）";
+                UseHighQuality = false;
+            }
+        }
+        catch
+        {
+            IsMineruReady = false;
+            UseHighQuality = false;
+        }
+
+        OnPropertyChanged(nameof(CanDownloadMineru));
+        OnPropertyChanged(nameof(CanUseHighQuality));
+    }
+
+    public bool CanDownloadMineru => !IsDownloadingMineru && !IsBusy && !IsMineruReady;
+
+    public bool CanUseHighQuality => IsMineruReady && !IsBusy;
+
+    partial void OnIsMineruReadyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanDownloadMineru));
+        OnPropertyChanged(nameof(CanUseHighQuality));
+    }
+
+    partial void OnIsDownloadingMineruChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanDownloadMineru));
+        OnPropertyChanged(nameof(CanUseHighQuality));
+    }
+
+    /// <summary>
+    /// 预下载高质量引擎。老师不急着用的时候可以放着慢慢下，装完一直有效。
+    /// </summary>
+    [RelayCommand]
+    private async Task DownloadMineruAsync()
+    {
+        if (!CanDownloadMineru)
+        {
+            return;
+        }
+
+        IsDownloadingMineru = true;
+        StatusText = "正在安装高质量引擎…";
+
+        var progress = new Progress<string>(message =>
+        {
+            StatusText = message;
+            AppendLog(message);
+        });
+
+        try
+        {
+            AppendLog("开始安装高质量引擎（MinerU + basic 模型，约 0.8GB）…");
+            AppendLog("这个过程可能要十几分钟，可以放着不管，装完会用一次提示告诉你。");
+
+            var result = await AppServices.Mineru
+                .InstallAsync(progress)
+                .ConfigureAwait(true);
+
+            AppendLog((result.Ok ? "✓ " : "✗ ") + result.Message);
+
+            RefreshMineruState();
+
+            StatusText = result.Ok ? "高质量模式已就绪" : "安装没完成，可以稍后再试";
+        }
+        catch (Exception ex)
+        {
+            AppendLog("✗ 安装出错：" + ex.Message);
+            StatusText = "安装出错";
+        }
+        finally
+        {
+            IsDownloadingMineru = false;
+            RefreshMineruState();
+        }
+    }
 
     [RelayCommand]
     private void BrowsePdf()
@@ -164,6 +275,24 @@ public sealed partial class PdfToWordViewModel : ObservableObject
 
         try
         {
+            // 勾了高质量且引擎就绪 → 走 MinerU（表格/公式/多栏还原明显更好）
+            var usedHighQuality = UseHighQuality && IsMineruReady
+                                  && await TryConvertWithMineruAsync(target, progress).ConfigureAwait(true);
+
+            if (usedHighQuality)
+            {
+                OutputFileText = target;
+                StatusText = "转换完成（高质量模式）";
+                AppendLog("✓ 已用 MinerU 生成：" + target);
+
+                if (UseAiCleanup)
+                {
+                    await CleanupWithAiAsync(PdfPath, target).ConfigureAwait(true);
+                }
+
+                return;
+            }
+
             var result = await _service.ConvertAsync(PdfPath, target, progress).ConfigureAwait(true);
 
             if (!result.Ok)
@@ -245,6 +374,74 @@ public sealed partial class PdfToWordViewModel : ObservableObject
         catch
         {
             // 忽略
+        }
+    }
+
+    /// <summary>
+    /// 用 MinerU 解析并写成 docx。失败返回 false（调用方自动回退到 pdf2docx）。
+    /// </summary>
+    private async Task<bool> TryConvertWithMineruAsync(string target, IProgress<string> progress)
+    {
+        var tempDir = Path.Combine(
+            Path.GetTempPath(),
+            "cm-mineru-" + Guid.NewGuid().ToString("N")[..6]);
+
+        try
+        {
+            AppendLog("使用高质量模式（MinerU）解析…");
+
+            var markdown = await AppServices.Mineru
+                .ConvertToMarkdownAsync(PdfPath, tempDir, progress)
+                .ConfigureAwait(true);
+
+            if (string.IsNullOrWhiteSpace(markdown))
+            {
+                AppendLog("MinerU 解析失败，改用常规转换：" + (AppServices.Mineru.LastError ?? "未知原因"));
+                return false;
+            }
+
+            AppendLog($"MinerU 解析完成（{markdown.Length} 字），正在生成 Word…");
+
+            var engineReady = await AppServices.Exam2Ppt
+                .EnsureEngineAsync(null, CancellationToken.None)
+                .ConfigureAwait(true);
+
+            if (!engineReady)
+            {
+                AppendLog("文档引擎不可用，改用常规转换");
+                return false;
+            }
+
+            await OfficeWriter
+                .WriteDocxAsync(AppServices.Exam2Ppt.EngineRoot, markdown, target, CancellationToken.None)
+                .ConfigureAwait(true);
+
+            if (!File.Exists(target))
+            {
+                AppendLog("MinerU 结果写文件失败，改用常规转换");
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppendLog("MinerU 出错，改用常规转换：" + ex.Message);
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+            }
+            catch
+            {
+                // 临时目录删不掉无所谓
+            }
         }
     }
 
