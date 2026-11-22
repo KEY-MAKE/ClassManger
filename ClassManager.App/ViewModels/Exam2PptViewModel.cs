@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.IO;
 using System.Text;
+using ClassManager.App.Models;
 using ClassManager.App.Services;
 using ClassManager.App.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -192,6 +193,16 @@ public sealed partial class Exam2PptViewModel : ObservableObject
     [RelayCommand]
     private void ClearTemplate() => TemplatePath = string.Empty;
 
+    /// <summary>
+    /// 生成前先用 AI 按《试卷格式规范》把试卷整理一遍（默认开）。
+    /// <para>
+    /// 课件引擎只认固定写法（题号、选项、答案标记都得是纯文本且格式统一），
+    /// 老师手上的试卷写法五花八门，以前要手动改才能过 —— 现在交给 AI 一次搞定。
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    private bool _useAiNormalize = true;
+
     /// <summary>打开背景设置窗口（预览 + 选择图片 / 使用默认背景）。</summary>
     [RelayCommand]
     private async Task ConfigureBackgroundAsync()
@@ -270,10 +281,26 @@ public sealed partial class Exam2PptViewModel : ObservableObject
 
         try
         {
+            // AI 先按规范整理试卷（不改内容，只调格式），否则引擎可能识别不了
+            var examForEngine = ExamPath;
+            var answerForEngine = AnswerPath;
+
+            if (UseAiNormalize)
+            {
+                examForEngine = await NormalizeWithAiAsync(ExamPath, "试题原卷", token).ConfigureAwait(true)
+                                ?? ExamPath;
+
+                if (!string.IsNullOrWhiteSpace(AnswerPath))
+                {
+                    answerForEngine = await NormalizeWithAiAsync(AnswerPath, "答案解析", token).ConfigureAwait(true)
+                                      ?? AnswerPath;
+                }
+            }
+
             var options = new Exam2PptOptions
             {
-                ExamDocxPath = ExamPath,
-                AnswerDocxPath = AnswerPath,
+                ExamDocxPath = examForEngine,
+                AnswerDocxPath = answerForEngine,
                 OutputPath = OutputPath,
                 TemplatePath = string.IsNullOrWhiteSpace(TemplatePath) ? null : TemplatePath,
                 BackgroundImagePath = string.IsNullOrWhiteSpace(BackgroundImagePath) ? null : BackgroundImagePath,
@@ -577,6 +604,139 @@ public sealed partial class Exam2PptViewModel : ObservableObject
             4 => "④ 排版生成…",
             _ => message.Trim(),
         };
+    }
+
+    /// <summary>
+    /// 用 AI 把试卷整理成引擎认识的格式。失败返回 null（调用方继续用原文件）。
+    /// </summary>
+    private async Task<string?> NormalizeWithAiAsync(string docxPath, string label, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(docxPath) || !File.Exists(docxPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            StageText = $"正在用 AI 整理{label}…";
+            AppendLogLines(new[] { $"[AI] 开始按规范整理{label}…" });
+
+            var read = AiDocumentReader.Read(docxPath);
+
+            if (!read.Ok || string.IsNullOrWhiteSpace(read.Text))
+            {
+                AppendLogLines(new[] { $"[AI] 读不出{label}正文，跳过整理，继续用原文件" });
+                return null;
+            }
+
+            var spec = ReadEmbeddedSpec();
+            var history = new List<AiMessage>
+            {
+                new() { Role = "user", Content = BuildNormalizePrompt(label, read.Text, spec) },
+            };
+
+            var reply = await AppServices.Ai
+                .CompleteAsync(history, Array.Empty<AiToolSpec>(), null, ct)
+                .ConfigureAwait(true);
+
+            if (!reply.Ok || string.IsNullOrWhiteSpace(reply.Content))
+            {
+                AppendLogLines(new[]
+                {
+                    $"[AI] {label}整理没有结果（{reply.Error ?? "模型返回空"}），继续用原文件",
+                });
+
+                return null;
+            }
+
+            if (!await _engine.EnsureEngineAsync(null, ct).ConfigureAwait(true))
+            {
+                AppendLogLines(new[] { "[AI] 文档引擎不可用，跳过整理" });
+                return null;
+            }
+
+            var temp = Path.Combine(Path.GetTempPath(), $"cm-norm-{Guid.NewGuid():N}.docx");
+            await OfficeWriter
+                .WriteDocxAsync(_engine.EngineRoot, reply.Content, temp, ct)
+                .ConfigureAwait(true);
+
+            if (!File.Exists(temp))
+            {
+                AppendLogLines(new[] { $"[AI] {label}整理结果写文件失败，继续用原文件" });
+                return null;
+            }
+
+            AppendLogLines(new[] { $"[AI] {label}已按规范整理完成" });
+            return temp;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLogLines(new[] { $"[AI] {label}整理出错：{ex.Message}，继续用原文件" });
+            return null;
+        }
+    }
+
+    /// <summary>从嵌入资源里读《试卷格式规范.md》（不依赖 AI 办公页有没有释放过）。</summary>
+    private static string ReadEmbeddedSpec()
+    {
+        try
+        {
+            var assembly = typeof(Exam2PptViewModel).Assembly;
+
+            var name = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("ai.exam-spec.md", StringComparison.OrdinalIgnoreCase));
+
+            if (name is null)
+            {
+                return string.Empty;
+            }
+
+            using var stream = assembly.GetManifestResourceStream(name);
+
+            if (stream is null)
+            {
+                return string.Empty;
+            }
+
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+            return reader.ReadToEnd();
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>整理提示词：只改格式，不动内容。</summary>
+    private static string BuildNormalizePrompt(string label, string text, string spec)
+    {
+        var sb = new System.Text.StringBuilder();
+
+        sb.AppendLine($"你是试卷格式整理助手。下面是一份{label}的正文，");
+        sb.AppendLine("请按《试卷格式规范》改写，让它能被自动排版程序正确识别。");
+        sb.AppendLine();
+        sb.AppendLine("**最重要的规则**：");
+        sb.AppendLine("- 只调整格式，**内容一个字都不能改**：题目文字、数字、选项、答案保持原样；");
+        sb.AppendLine("- 不要增删题目，不要改答案，不要补充解析；");
+        sb.AppendLine("- 用 Markdown 输出：大题用 `## `，小题一段，选项用 `- `；");
+        sb.AppendLine("- 只输出整理后的正文，不要解释。");
+        sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(spec))
+        {
+            sb.AppendLine("以下是必须遵守的《试卷格式规范》：");
+            sb.AppendLine(spec.Length > 20000 ? spec[..20000] + "\n…（规范后略）" : spec);
+            sb.AppendLine();
+        }
+
+        sb.AppendLine($"===== {label}原文 =====");
+        sb.AppendLine(text.Length > 24000 ? text[..24000] + "\n…（后略）" : text);
+
+        return sb.ToString();
     }
 
     private void AppendLogLines(IReadOnlyList<string> lines)
