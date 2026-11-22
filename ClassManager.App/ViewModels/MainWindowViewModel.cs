@@ -124,6 +124,33 @@ public sealed partial class MainWindowViewModel : ObservableObject, IShell
     }
 
     /// <summary>执行一次导入（供 ImportCommand 与各页面共用）。</summary>
+    /// <summary>
+    /// 启动时提示「高质量 PDF 解析模式」可以装（未安装才提示，装过就安静）。
+    /// <para>
+    /// 不弹对话框 —— 那太打断人。走 Toast，用户看到就知道有这回事，
+    /// 想装的时候去「PDF 转 Word」页面点预下载。
+    /// </para>
+    /// </summary>
+    public void PromptMineruIfNotInstalled()
+    {
+        try
+        {
+            if (AppServices.Mineru.IsInstalled)
+            {
+                return;
+            }
+
+            ShowToast(
+                "PDF 转 Word 有更高质量的解析引擎",
+                "高质量模式未安装（约 0.8GB）。到「PDF 转 Word」页面可以后台慢慢下载，不影响现在的使用。",
+                ControlAppearance.Info);
+        }
+        catch
+        {
+            // 提示失败不能影响启动
+        }
+    }
+
     public async Task ImportRosterAsync()
     {
         var dialog = new OpenFileDialog
