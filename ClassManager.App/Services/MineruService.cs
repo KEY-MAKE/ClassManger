@@ -90,8 +90,10 @@ public sealed class MineruService
                 new[]
                 {
                     "-m", "pip", "install", "--upgrade", PackageSpec,
-                    "--index-url", "https://pypi.tuna.tsinghua.edu.cn/simple",
-                    "--trusted-host", "pypi.tuna.tsinghua.edu.cn",
+                    // 注意：清华镜像**没有** mineru 这个包（实测 No matching distribution），
+                    // 阿里云/中科大/腾讯云都有。别再用清华。
+                    "--index-url", "https://mirrors.aliyun.com/pypi/simple/",
+                    "--trusted-host", "mirrors.aliyun.com",
                     "--disable-pip-version-check", "--no-input",
                 },
                 TimeSpan.FromMinutes(30),
@@ -103,26 +105,51 @@ public sealed class MineruService
                 return new InstallOutcome(false, "安装 MinerU 失败：" + LastError);
             }
 
+            // 关键一步：MinerU 的命令行用了 `str | None` 这种写法，
+            // 老版本 typer（0.12 及以下）不认，会直接抛
+            // 「RuntimeError: Type not yet supported: str | None」，所有 mineru 命令都跑不起来。
+            // 用户机器上常被别的包（比如 nonebot 那套）把 typer 压到旧版本，所以这里必须纠正。
+            progress?.Report("正在校正 typer 版本（MinerU 命令依赖）…");
+
+            var typerFix = await RunAsync(
+                python.PythonPath,
+                new[]
+                {
+                    "-m", "pip", "install", "--upgrade", "typer>=0.15",
+                    "--index-url", "https://mirrors.aliyun.com/pypi/simple/",
+                    "--trusted-host", "mirrors.aliyun.com",
+                    "--disable-pip-version-check", "--no-input",
+                },
+                TimeSpan.FromMinutes(10),
+                ct).ConfigureAwait(false);
+
+            if (!typerFix.Ok)
+            {
+                LastError = Summarize(typerFix.Error, typerFix.Output);
+                return new InstallOutcome(false, "校正 typer 版本失败：" + LastError);
+            }
+
             // 3) 下载 basic 档模型（约 0.8GB）
             progress?.Report("正在下载解析模型（basic 档，约 0.8GB）…");
 
+            // 4.2.3 的入口是 console_scripts：Scripts\mineru-models-download.exe
+            // 用法：mineru-models-download --tier basic --source auto
+            // （不是早期文档写的 "mineru-kit models download"）
+            var modelsTool = FindConsoleScript(python.PythonPath, "mineru-models-download");
+
+            if (modelsTool is null)
+            {
+                LastError = "找不到 mineru-models-download 命令（包可能没装完整）";
+                return new InstallOutcome(false, LastError);
+            }
+
+            // --small-backend onnx：走 ONNX 运行时，CPU 上就能跑（torch 后端要 GPU 才快）
+            // --source modelscope：国内下载比 huggingface 稳
             var models = await RunAsync(
-                python.PythonPath,
-                new[] { "-m", "mineru.cli.kit", "models", "download", "--tier", DefaultTier },
+                modelsTool,
+                new[] { "--tier", DefaultTier, "--small-backend", "onnx", "--source", "modelscope" },
                 TimeSpan.FromMinutes(40),
                 ct).ConfigureAwait(false);
-
-            if (!models.Ok)
-            {
-                // 换一个可能的入口再试一次（4.x 的 kit 命令位置有变动）
-                progress?.Report("换用备用命令再试一次…");
-
-                models = await RunAsync(
-                    python.PythonPath,
-                    new[] { "-m", "mineru", "models", "download", "--tier", DefaultTier },
-                    TimeSpan.FromMinutes(40),
-                    ct).ConfigureAwait(false);
-            }
 
             if (!models.Ok)
             {
@@ -175,15 +202,18 @@ public sealed class MineruService
 
             progress?.Report("正在用 MinerU 解析（CPU 上每页约几秒）…");
 
-            // mineru parse "<pdf>" --output "<dir>" --tier basic
+            // 4.2.3：mineru-kit parse <input> -o <output> --tier basic
+            var kitTool = FindConsoleScript(python, "mineru-kit");
+
+            if (kitTool is null)
+            {
+                LastError = "找不到 mineru-kit 命令（包可能没装完整）";
+                return null;
+            }
+
             var run = await RunAsync(
-                python,
-                new[]
-                {
-                    "-m", "mineru", "parse", pdfPath,
-                    "--output", outputDirectory,
-                    "--tier", DefaultTier,
-                },
+                kitTool,
+                new[] { "parse", pdfPath, "-o", outputDirectory, "-f", "markdown", "--tier", DefaultTier },
                 TimeSpan.FromMinutes(30),
                 ct).ConfigureAwait(false);
 
@@ -233,6 +263,43 @@ public sealed class MineruService
     }
 
     // ---------- 内部 ----------
+
+    /// <summary>找 Python 安装目录下 Scripts 里的 console script（如 mineru-kit.exe）。</summary>
+    private static string? FindConsoleScript(string python, string name)
+    {
+        try
+        {
+            var pythonDir = Path.GetDirectoryName(python);
+
+            if (string.IsNullOrEmpty(pythonDir))
+            {
+                return null;
+            }
+
+            var scripts = Path.Combine(pythonDir, "Scripts");
+
+            if (!Directory.Exists(scripts))
+            {
+                return null;
+            }
+
+            foreach (var candidate in new[] { name + ".exe", name + ".cmd", name })
+            {
+                var path = Path.Combine(scripts, candidate);
+
+                if (File.Exists(path))
+                {
+                    return path;
+                }
+            }
+        }
+        catch
+        {
+            // 忽略
+        }
+
+        return null;
+    }
 
     private static bool HasModule(string python)
     {
