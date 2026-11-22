@@ -82,26 +82,20 @@ public sealed class MineruService
                 return new InstallOutcome(false, python.Message);
             }
 
-            // 2) pip 装包
+            // 2) pip 装包（多镜像轮换：阿里云 → 中科大 → 腾讯云 → 清华 → 官方）
+            //    实测清华**没有** mineru 这个包，写死单源会直接失败
             progress?.Report($"正在安装 MinerU（{PackageSpec}，约 500MB，请耐心等）…");
 
-            var install = await RunAsync(
+            var install = await PackageMirrors.InstallWithFallbackAsync(
                 python.PythonPath,
-                new[]
-                {
-                    "-m", "pip", "install", "--upgrade", PackageSpec,
-                    // 注意：清华镜像**没有** mineru 这个包（实测 No matching distribution），
-                    // 阿里云/中科大/腾讯云都有。别再用清华。
-                    "--index-url", "https://mirrors.aliyun.com/pypi/simple/",
-                    "--trusted-host", "mirrors.aliyun.com",
-                    "--disable-pip-version-check", "--no-input",
-                },
-                TimeSpan.FromMinutes(30),
-                ct).ConfigureAwait(false);
+                new[] { PackageSpec },
+                progress,
+                ct,
+                TimeSpan.FromMinutes(30)).ConfigureAwait(false);
 
             if (!install.Ok)
             {
-                LastError = Summarize(install.Error, install.Output);
+                LastError = install.Detail;
                 return new InstallOutcome(false, "安装 MinerU 失败：" + LastError);
             }
 
@@ -111,21 +105,16 @@ public sealed class MineruService
             // 用户机器上常被别的包（比如 nonebot 那套）把 typer 压到旧版本，所以这里必须纠正。
             progress?.Report("正在校正 typer 版本（MinerU 命令依赖）…");
 
-            var typerFix = await RunAsync(
+            var typerFix = await PackageMirrors.InstallWithFallbackAsync(
                 python.PythonPath,
-                new[]
-                {
-                    "-m", "pip", "install", "--upgrade", "typer>=0.15",
-                    "--index-url", "https://mirrors.aliyun.com/pypi/simple/",
-                    "--trusted-host", "mirrors.aliyun.com",
-                    "--disable-pip-version-check", "--no-input",
-                },
-                TimeSpan.FromMinutes(10),
-                ct).ConfigureAwait(false);
+                new[] { "typer>=0.15" },
+                progress,
+                ct,
+                TimeSpan.FromMinutes(10)).ConfigureAwait(false);
 
             if (!typerFix.Ok)
             {
-                LastError = Summarize(typerFix.Error, typerFix.Output);
+                LastError = typerFix.Detail;
                 return new InstallOutcome(false, "校正 typer 版本失败：" + LastError);
             }
 
