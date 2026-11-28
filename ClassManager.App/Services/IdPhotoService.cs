@@ -36,12 +36,21 @@ public sealed class IdPhotoService : IIdPhotoService
     /// <summary>模型完整大小约 170MB，低于这个值视为没下完。</summary>
     private const long ModelMinBytes = 150L * 1024 * 1024;
 
-    /// <summary>模型下载地址：GitHub 直连优先，然后两个国内可用的加速前缀。</summary>
+    /// <summary>官方 u2net.onnx 的 MD5（大小 175,997,641 字节）。</summary>
+    private const string ModelMd5 = "60024c5c889badc19c04ad937298a77b";
+
+    /// <summary>
+    /// 模型下载地址。
+    /// <para>
+    /// <b>ModelScope 放第一</b>：实测国内直连 2~3MB/s，两分钟能下完；
+    /// GitHub 直连被限到 ~11KB/s（170MB 得下几个小时），加速前缀时好时坏，只能兜底。
+    /// </para>
+    /// </summary>
     private static readonly string[] ModelUrls =
     {
+        "https://modelscope.cn/models/AI-ModelScope/u2net/resolve/master/u2net.onnx",
         "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
         "https://gh-proxy.com/https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
-        "https://ghfast.top/https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
     };
 
     /// <summary>需要的 Python 模块（import 名）。</summary>
@@ -73,6 +82,14 @@ public sealed class IdPhotoService : IIdPhotoService
 
         try
         {
+            // 装过就直接用：首次 import rembg 会被杀软拖到 1~2 分钟，
+            // 每次生成都跑三遍 import 探测太亏，标记可信就不重复探。
+            if (IsReady)
+            {
+                progress?.Report("图像处理组件已就绪。");
+                return true;
+            }
+
             progress?.Report("正在准备 Python 环境…");
 
             var python = await PythonBootstrap
@@ -227,6 +244,7 @@ public sealed class IdPhotoService : IIdPhotoService
         if (!run.Ok || !run.Output.Contains("DONE", StringComparison.Ordinal))
         {
             LastError = ExtractError(run);
+            InvalidateMarkerIfMissingModule(run);
             return Fail("生成失败：" + LastError);
         }
 
@@ -552,6 +570,13 @@ public sealed class IdPhotoService : IIdPhotoService
                         throw new InvalidOperationException("下载不完整。");
                     }
 
+                    var md5 = await Md5OfFileAsync(temp, ct).ConfigureAwait(false);
+
+                    if (!string.Equals(md5, ModelMd5, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException($"校验不通过（MD5 {md5}）。");
+                    }
+
                     File.Move(temp, ModelPath, overwrite: true);
                     progress?.Report("抠图模型已就绪。");
                     return;
@@ -597,13 +622,28 @@ public sealed class IdPhotoService : IIdPhotoService
         }
     }
 
+    /// <summary>算文件 MD5（模型校验用，176MB 约 0.5 秒）。</summary>
+    private static async Task<string> Md5OfFileAsync(string path, CancellationToken ct)
+    {
+        await using var stream = File.OpenRead(path);
+        var hash = await System.Security.Cryptography.MD5
+            .HashDataAsync(stream, ct)
+            .ConfigureAwait(false);
+
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
     /// <summary>检查某个 Python 模块能不能 import。</summary>
+    /// <remarks>
+    /// 超时给到 5 分钟：rembg 第一次 import（numba / scikit-image / onnxruntime）在
+    /// 开了实时防护的机器上实测能到 100 秒，给 2 分钟会误判成「没装」。
+    /// </remarks>
     private static async Task<bool> HasModuleAsync(string python, string module, CancellationToken ct)
     {
         var run = await RunPythonAsync(
             python,
             $"import {module}\nprint('HAS_MODULE')\n",
-            TimeSpan.FromSeconds(120),
+            TimeSpan.FromMinutes(5),
             ct).ConfigureAwait(false);
 
         return run.Ok && run.Output.Contains("HAS_MODULE", StringComparison.Ordinal);
@@ -683,6 +723,33 @@ public sealed class IdPhotoService : IIdPhotoService
             }
 
             return (false, string.Empty, ct.IsCancellationRequested ? "已取消。" : "执行超时。");
+        }
+    }
+
+    /// <summary>
+    /// 标记文件可能过期（用户手动卸了包 / Python 被换掉）。这种情况删掉标记，
+    /// 下次调用会重新检测并安装，而不是一直走进「已就绪」的死路。
+    /// </summary>
+    private static void InvalidateMarkerIfMissingModule((bool Ok, string Output, string Error) run)
+    {
+        var text = run.Output + "\n" + run.Error;
+
+        if (!text.Contains("ModuleNotFoundError", StringComparison.OrdinalIgnoreCase)
+            && !text.Contains("No module named", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            if (File.Exists(MarkerPath))
+            {
+                File.Delete(MarkerPath);
+            }
+        }
+        catch
+        {
+            // 删不掉就留着，不影响本次报错
         }
     }
 
