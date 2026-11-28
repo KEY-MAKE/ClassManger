@@ -83,6 +83,12 @@ public partial class MainWindow : FluentWindow
         }
     }
 
+    /// <summary>
+    /// 允许真正关闭（托盘菜单「退出」时置 true）。
+    /// <para>平时关窗口只是收进托盘 —— 老师上课时关了窗口，悬浮球还得能点名。</para>
+    /// </summary>
+    public bool AllowRealClose { get; set; }
+
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
@@ -98,5 +104,13 @@ public partial class MainWindow : FluentWindow
         }
 
         AppServices.Settings.Save();
+
+        // 不是真的退出 → 收进托盘继续跑
+        if (!AllowRealClose)
+        {
+            e.Cancel = true;
+            Hide();
+            AppServices.Tray?.ShowHideHintOnce();
+        }
     }
 }

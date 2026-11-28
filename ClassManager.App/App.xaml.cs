@@ -183,12 +183,32 @@ public partial class App : Application
             _floatingBall = null;
         }
 
+        // 托盘图标：主窗口关掉后靠它把程序叫回来、彻底退出
+        try
+        {
+            AppServices.Tray ??= new TrayIconService(window);
+        }
+        catch
+        {
+            // 托盘起不来不影响主功能
+        }
+
         window.Closed += (_, _) =>
         {
             try
             {
                 _floatingBall?.Close();
                 _floatingBall = null;
+            }
+            catch
+            {
+                // 忽略
+            }
+
+            try
+            {
+                AppServices.Tray?.Dispose();
+                AppServices.Tray = null;
             }
             catch
             {

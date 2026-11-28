@@ -12,6 +12,9 @@ public static class AppServices
 
     public static IRollCallService RollCall { get; private set; } = null!;
 
+    /// <summary>系统托盘图标。主窗口关掉后靠它把程序叫回来。</summary>
+    public static TrayIconService? Tray { get; internal set; }
+
     /// <summary>
     /// 点名状态变了（悬浮球点了名 / 复位了）。
     /// <para>

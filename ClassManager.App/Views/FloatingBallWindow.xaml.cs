@@ -50,6 +50,14 @@ public partial class FloatingBallWindow : Window
             StartTopmostGuard();
         };
 
+        SourceInitialized += (_, _) =>
+        {
+            if (PresentationSource.FromVisual(this) is HwndSource source)
+            {
+                source.AddHook(WndProc);
+            }
+        };
+
         Closed += (_, _) =>
         {
             _nameTimer?.Stop();
@@ -278,6 +286,68 @@ public partial class FloatingBallWindow : Window
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
         int x, int y, int cx, int cy, uint flags);
+
+    /// <summary>
+    /// 让「不该点的区域」鼠标穿透过去。
+    /// <para>
+    /// 透明窗口的命中测试是按矩形算的：72×72 的收起态、340×340 的展开态，
+    /// 四角那些完全透明的地方照样会吃掉下面的点击 —— 用户会觉得「这块点不动了」。
+    /// 这里按圆形判定，圆外一律返回 HTTRANSPARENT，鼠标事件直接穿到下层窗口。
+    /// </para>
+    /// </summary>
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WM_NCHITTEST = 0x0084;
+        const int HTTRANSPARENT = -1;
+
+        if (msg != WM_NCHITTEST)
+        {
+            return IntPtr.Zero;
+        }
+
+        try
+        {
+            // lParam 低 16 位是 x、高 16 位是 y（屏幕坐标，有符号）
+            var raw = lParam.ToInt64();
+            var screenX = (short)(raw & 0xFFFF);
+            var screenY = (short)((raw >> 16) & 0xFFFF);
+
+            var local = PointFromScreen(new Point(screenX, screenY));
+
+            var cx = ActualWidth / 2;
+            var cy = ActualHeight / 2;
+            var dx = local.X - cx;
+            var dy = local.Y - cy;
+
+            // 收起时只有球（半径 31）；展开时盘面（半径 152）
+            var radius = _expanded ? 152.0 : 31.0;
+
+            if (dx * dx + dy * dy > radius * radius)
+            {
+                handled = true;
+                return new IntPtr(HTTRANSPARENT);
+            }
+        }
+        catch
+        {
+            // 算不出来就按默认（可点）处理，宁可挡住也不能让球点不了
+        }
+
+        return IntPtr.Zero;
+    }
+
+    /// <summary>右键「隐藏悬浮球」：藏起来，用托盘图标可以再叫出来。</summary>
+    private void OnHideBallClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Hide();
+        }
+        catch
+        {
+            // 忽略
+        }
+    }
 
     private void KeepOnTop()
     {
