@@ -11,12 +11,37 @@ public partial class IdPhotoPage : Page
 {
     private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".webp" };
 
+    private static void Diag(string message)
+    {
+        try
+        {
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cm_idphoto.log");
+            System.IO.File.AppendAllText(
+                path,
+                $"{DateTime.Now:HH:mm:ss.fff} [页面] {message}\n",
+                new System.Text.UTF8Encoding(false));
+        }
+        catch
+        {
+            // 忽略
+        }
+    }
+
     public IdPhotoPage()
     {
+        Diag("构造开始");
         InitializeComponent();
+        Diag("InitializeComponent 完成");
 
         // NavigationView 不给 Page 限高，这里把页面钉到宿主高度（详见 PageHeightBinder）
-        Loaded += (_, _) => PageHeightBinder.Attach(this, Root);
+        Loaded += (_, _) =>
+        {
+            Diag("Loaded，开始 Attach");
+            PageHeightBinder.Attach(this, Root);
+            Diag("Attach 完成");
+        };
+
+        Unloaded += (_, _) => Diag("Unloaded");
     }
 
     private IdPhotoViewModel? ViewModel => DataContext as IdPhotoViewModel;

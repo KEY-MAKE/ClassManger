@@ -37,16 +37,27 @@ public static class PageHeightBinder
         if (host is not null)
         {
             Apply(host.ActualHeight);
-            host.SizeChanged += (_, _) => Apply(host.ActualHeight);
+
+            // 必须能摘下来：host 是常驻的 NavigationView，同一个页面类反复进出时
+            // 每次 Attach 都会再挂一个 handler，越积越多，切页会越来越卡。
+            void OnHostSizeChanged(object? sender, SizeChangedEventArgs e) => Apply(host.ActualHeight);
+
+            host.SizeChanged += OnHostSizeChanged;
+            page.Unloaded += (_, _) => host.SizeChanged -= OnHostSizeChanged;
             return;
         }
 
         // 兜底：找不到 NavigationView 时用主窗口高度减去标题栏与状态栏
         var window = Window.GetWindow(page);
+
         if (window is not null)
         {
             Apply(window.ActualHeight - 120);
-            window.SizeChanged += (_, _) => Apply(window.ActualHeight - 120);
+
+            void OnWindowSizeChanged(object? sender, SizeChangedEventArgs e) => Apply(window.ActualHeight - 120);
+
+            window.SizeChanged += OnWindowSizeChanged;
+            page.Unloaded += (_, _) => window.SizeChanged -= OnWindowSizeChanged;
         }
     }
 
