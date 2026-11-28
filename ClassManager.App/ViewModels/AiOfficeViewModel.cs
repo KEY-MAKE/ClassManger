@@ -111,13 +111,22 @@ public sealed partial class ChatItem : ObservableObject
 /// <summary>AI 办公页 ViewModel：多会话、流式对话、本地文件工具（工作区沙箱 + 写前确认）。</summary>
 public sealed partial class AiOfficeViewModel : ObservableObject
 {
-    private const int MaxToolRounds = 12;
+    /// <summary>
+    /// 单次任务最多几轮工具调用。
+    /// <para>
+    /// 原来是 12，配上 2 次自动续跑 = 一次任务最多 36 轮模型调用；
+    /// 每轮还带完整历史，token 消耗非常可观（用户反馈「不用的时候 key 也在掉」）。
+    /// 收到 6 轮已经够绝大多数任务用，超了就提示用户说「继续」。
+    /// </para>
+    /// </summary>
+    private const int MaxToolRounds = 6;
 
     /// <summary>
     /// 轮次用尽时允许自动续跑的次数。上一轮还在调工具说明任务没干完，
     /// 不该在这里硬生生截断——这正是「莫名其妙报任务完成」的另一个来源。
     /// </summary>
-    private const int MaxAutoContinuations = 2;
+    /// <summary>自动续跑次数（原来 2，太容易把 token 烧掉，收成 1）。</summary>
+    private const int MaxAutoContinuations = 1;
 
     /// <summary>
     /// 连续异常（输出被截断 / DSML 泄漏）的最大纠错重试次数。
@@ -798,8 +807,45 @@ public sealed partial class AiOfficeViewModel : ObservableObject
             var continuations = 0;
             var round = 0;
 
+            // 一次任务的硬预算：不管模型怎么绕，最多调这么多次、跑这么久。
+            // 没有这层兜底时，工具反复失败会一直续跑，用户以为"没在用"其实在后台烧 token。
+            var taskStartedAt = DateTime.UtcNow;
+            var apiCalls = 0;
+
+            const int MaxApiCallsPerTask = 20;
+            var maxTaskDuration = TimeSpan.FromMinutes(6);
+
             while (round < MaxToolRounds)
             {
+                // ① 时长上限
+                if (DateTime.UtcNow - taskStartedAt > maxTaskDuration)
+                {
+                    StatusText = "本次任务已超过 6 分钟，已停止";
+                    Messages.Add(new ChatItem
+                    {
+                        Role = "tool",
+                        Content = "（本次任务运行超过 6 分钟，已自动停止以控制消耗。需要的话说「继续」。）",
+                    });
+
+                    finishedNormally = true;
+                    break;
+                }
+
+                // ② 请求次数上限
+                if (apiCalls >= MaxApiCallsPerTask)
+                {
+                    StatusText = "本次任务请求次数已达上限";
+                    Messages.Add(new ChatItem
+                    {
+                        Role = "tool",
+                        Content = "（本次任务已发满 20 次模型请求，自动停止。需要的话说「继续」。）",
+                    });
+
+                    finishedNormally = true;
+                    break;
+                }
+
+                apiCalls++;
                 round++;
                 token.ThrowIfCancellationRequested();
 

@@ -182,6 +182,7 @@ public sealed class AiChatService : IAiChatService
         }
 
         var modelErrors = new List<string>();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
@@ -193,6 +194,15 @@ public sealed class AiChatService : IAiChatService
             if (outcome is not null)
             {
                 LastUsedModel = model;
+
+                AiUsageLog.Write(
+                    true,
+                    model,
+                    outcome.KeyLabel,
+                    stopwatch.Elapsed,
+                    outcome.Usage.PromptTokens,
+                    outcome.Usage.CompletionTokens);
+
                 return outcome;
             }
 
@@ -207,6 +217,15 @@ public sealed class AiChatService : IAiChatService
                     $"{model} 配额用尽或不可用，换用 {models[modelIndex + 1]} 重试…"));
             }
         }
+
+        AiUsageLog.Write(
+            false,
+            string.Join(",", modelErrors),
+            "-",
+            stopwatch.Elapsed,
+            0,
+            0,
+            _lastErrorSummary);
 
         return new AiTurnResult
         {
@@ -276,11 +295,12 @@ public sealed class AiChatService : IAiChatService
                 // 但「配额用尽」不要重试：这个平台按模型分配配额，配额是真没了，
                 // 等 3 秒 8 秒都没用 —— 只有换模型才有救。原来 6 把 key × 3 次 ≈ 34 秒，
                 // 砍掉之后几秒就能换到能用的模型。
+                // 配额是「账号 + 模型」级别的：换成别的 key 照样 429，
+                // 试 6 把 key 只会白烧 5 次请求。直接放弃这个模型，让上层换模型。
                 if (outcome.RateLimited && IsQuotaExhausted(outcome.Error))
                 {
-                    switchKey = true;
-                    stream?.Report(new AiStreamUpdate(null, null, $"{label} 配额用尽，换下一个通道…"));
-                    break;
+                    stream?.Report(new AiStreamUpdate(null, null, $"{label} 配额用尽，换下一个模型…"));
+                    return null;
                 }
 
                 if (!outcome.Retryable || attempt == maxAttemptsPerKey - 1)
