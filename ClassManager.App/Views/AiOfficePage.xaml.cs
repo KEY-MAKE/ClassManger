@@ -171,4 +171,26 @@ public partial class AiOfficePage : Page
             _viewModel.SendCommand.Execute(null);
         }
     }
+
+    /// <summary>打开 Key 配置窗口；保存后刷新模型下拉（换了 key 可能连模型都不一样了）。</summary>
+    private void OnConfigureKeyClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var window = new AiKeySettingsWindow { Owner = Window.GetWindow(this) };
+
+            if (window.ShowDialog() == true)
+            {
+                _viewModel?.ReloadModels();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show(
+                "打开设置窗口失败：" + ex.Message,
+                "AI 服务设置",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+        }
+    }
 }

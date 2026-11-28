@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -189,6 +190,7 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         }
 
         UpdateStatusTexts();
+        LoadModelChoices();
         RefreshModelBadge();
     }
 
@@ -283,6 +285,41 @@ public sealed partial class AiOfficeViewModel : ObservableObject
         };
 
         return new AiFileTools(scoped, ConfirmWriteAsync);
+    }
+
+    /// <summary>把服务里的模型目录铺到下拉框，默认选中首选模型。</summary>
+    private void LoadModelChoices()
+    {
+        try
+        {
+            Models.Clear();
+
+            foreach (var option in _chat.AvailableModels)
+            {
+                Models.Add(option);
+            }
+
+            if (Models.Count == 0)
+            {
+                return;
+            }
+
+            var primary = Models.FirstOrDefault(m =>
+                string.Equals(m.Id, _chat.PrimaryModel, StringComparison.OrdinalIgnoreCase));
+
+            SelectedModel = primary ?? Models[0];
+        }
+        catch
+        {
+            // 拿不到就让下拉框空着，AI 仍能用默认模型
+        }
+    }
+
+    /// <summary>外部换了 key 之后，重新铺一遍模型选项。</summary>
+    public void ReloadModels()
+    {
+        LoadModelChoices();
+        RefreshModelBadge();
     }
 
     /// <summary>刷新右下角的模型徽标。</summary>
@@ -467,6 +504,30 @@ public sealed partial class AiOfficeViewModel : ObservableObject
     /// <summary>右下角显示的当前模型（主模型配额耗尽时会是 fallback 那个）。</summary>
     [ObservableProperty]
     private string _modelBadgeText = string.Empty;
+
+    /// <summary>用户可选的模型（带消耗标注）。</summary>
+    public ObservableCollection<AiModelOption> Models { get; } = new();
+
+    /// <summary>
+    /// 用户当前选中的模型。选中后 <see cref="AiChatService.PreferredModel"/> 会被设上，
+    /// 后端就只走这一个、不再自动 fallback。
+    /// </summary>
+    [ObservableProperty]
+    private AiModelOption? _selectedModel;
+
+    partial void OnSelectedModelChanged(AiModelOption? value)
+    {
+        try
+        {
+            _chat.PreferredModel = value?.Id ?? string.Empty;
+        }
+        catch
+        {
+            // 忽略
+        }
+
+        RefreshModelBadge();
+    }
 
     /// <summary>提示词优化进行中。</summary>
     [ObservableProperty]
@@ -908,6 +969,37 @@ public sealed partial class AiOfficeViewModel : ObservableObject
 
                 if (!result.Ok)
                 {
+                    // 配额用尽：这是「用户需要做决定」的情况，必须打断他 ——
+                    // 提示换模型，然后停止任务，别让他对着转圈干等。
+                    if (result.QuotaExhausted)
+                    {
+                        var advice = "当前模型的配额已经用尽。\n\n"
+                                     + "请点上方的模型下拉框，换一个模型再试。";
+
+                        bubble.Role = "error";
+                        bubble.Content = "【配额已用尽，任务已停止】\n\n" + advice;
+                        assistantMessage.IsError = true;
+                        assistantMessage.Content = bubble.Content;
+                        StatusText = "模型配额已用尽，请更换模型";
+                        Persist();
+
+                        try
+                        {
+                            System.Windows.MessageBox.Show(
+                                advice,
+                                "配额已用尽",
+                                System.Windows.MessageBoxButton.OK,
+                                System.Windows.MessageBoxImage.Warning);
+                        }
+                        catch
+                        {
+                            // 弹窗失败也不能让任务卡住
+                        }
+
+                        finishedNormally = true;
+                        break;
+                    }
+
                     bubble.Role = "error";
                     bubble.Content = result.Error ?? "请求失败。";
                     assistantMessage.IsError = true;

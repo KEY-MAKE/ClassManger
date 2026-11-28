@@ -298,13 +298,27 @@
                                            IsEnabled="{Binding CanOptimize}"
                                            Command="{Binding OptimizePromptCommand}" />
 
-                                <!-- 当前模型：主模型额度用完时会自动切备用，这里能看到实际用的哪个 -->
-                                <TextBlock Text="{Binding ModelBadgeText}"
-                                           VerticalAlignment="Center"
-                                           Margin="2,0,10,0"
-                                           Style="{StaticResource CaptionTextStyle}"
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                           ToolTip="当前使用的模型。主模型额度用尽时会自动切到备用模型。" />
+                                <!-- 模型选择：选中某个模型后只走它，配额用完会提示更换 -->
+                                <ui:Button Appearance="Transparent"
+                                           Padding="6"
+                                           Margin="0,0,4,0"
+                                           ToolTip="用自己的 API Key（内置额度是大家共享的，人多了容易用完）"
+                                           Icon="{ui:SymbolIcon Key24}"
+                                           Click="OnConfigureKeyClick" />
+
+                                <ComboBox ItemsSource="{Binding Models}"
+                                          SelectedItem="{Binding SelectedModel}"
+                                          DisplayMemberPath="Display"
+                                          Width="280"
+                                          Margin="2,0,10,0"
+                                          VerticalAlignment="Center"
+                                          ToolTip="选择调用的模型；括号里是消耗档位。选定后只走这一个，配额用尽会提示你换。">
+                                    <ComboBox.ItemContainerStyle>
+                                        <Style TargetType="ComboBoxItem">
+                                            <Setter Property="ToolTip" Value="{Binding Note}" />
+                                        </Style>
+                                    </ComboBox.ItemContainerStyle>
+                                </ComboBox>
 
                                 <ui:Button Content="取消" Margin="0,0,8,0"
                                            IsEnabled="{Binding CanCancel}"

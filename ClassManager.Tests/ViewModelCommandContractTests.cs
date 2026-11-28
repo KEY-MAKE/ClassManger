@@ -58,6 +58,14 @@ public class ViewModelCommandContractTests
     [InlineData(typeof(AiOfficeViewModel), "RemoveAttachmentCommand")]
     [InlineData(typeof(AiOfficeViewModel), "RenameConversationCommand")]
     [InlineData(typeof(AiOfficeViewModel), "SendCommand")]
+    // IdPhotoPage.xaml
+    [InlineData(typeof(IdPhotoViewModel), "BrowseImageCommand")]
+    [InlineData(typeof(IdPhotoViewModel), "BrowseOutputCommand")]
+    [InlineData(typeof(IdPhotoViewModel), "ComposeSheetCommand")]
+    [InlineData(typeof(IdPhotoViewModel), "GenerateCommand")]
+    [InlineData(typeof(IdPhotoViewModel), "InstallEngineCommand")]
+    [InlineData(typeof(IdPhotoViewModel), "OpenOutputFolderCommand")]
+    [InlineData(typeof(IdPhotoViewModel), "OpenResultCommand")]
     public void Command_property_exists(Type viewModelType, string propertyName)
     {
         var property = viewModelType.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);

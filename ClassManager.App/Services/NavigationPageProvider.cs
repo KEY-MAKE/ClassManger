@@ -28,9 +28,25 @@ public sealed class NavigationPageProvider : INavigationViewPageProvider
     /// </summary>
     private PdfToWordViewModel? _pdfToWordViewModel;
 
+    /// <summary>
+    /// 证件照的 ViewModel 缓存：生成是后台任务，切走再回来要能看到已出的图和日志，
+    /// 而不是一张白板。
+    /// </summary>
+    private IdPhotoViewModel? _idPhotoViewModel;
+
     /// <inheritdoc />
     public object? GetPage(Type pageType)
     {
+        if (pageType == typeof(IdPhotoPage))
+        {
+            var page = new IdPhotoPage();
+
+            _idPhotoViewModel ??= new IdPhotoViewModel();
+            page.DataContext = _idPhotoViewModel;
+
+            return page;
+        }
+
         if (pageType == typeof(PdfToWordPage))
         {
             var page = new PdfToWordPage();

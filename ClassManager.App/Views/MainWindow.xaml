@@ -70,6 +70,11 @@
                         <ui:SymbolIcon Symbol="DocumentPdf24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="证件照" TargetPageType="{x:Type views:IdPhotoPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="ContactCard24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
                 <ui:NavigationViewItem Content="AI 办公" TargetPageType="{x:Type views:AiOfficePage}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="ChatSparkle24" />

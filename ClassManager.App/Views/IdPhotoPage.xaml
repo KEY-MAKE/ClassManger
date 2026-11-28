@@ -1,0 +1,272 @@
+<Page x:Class="ClassManager.App.Views.IdPhotoPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="证件照"
+      AllowDrop="True"
+      DragOver="OnDragOver"
+      Drop="OnDrop">
+    <Grid x:Name="Root" Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="400" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左栏：步骤 -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,16,0">
+            <StackPanel>
+                <!-- ① 选择照片 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="① 选择照片" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding SourceImagePath, Mode=OneWay}"
+                                        PlaceholderText="选择一张正面免冠照片（也可以直接拖进来）"
+                                        IsReadOnly="True"
+                                        ToolTip="{Binding SourceImagePath}" />
+                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                       Command="{Binding BrowseImageCommand}" />
+                        </Grid>
+
+                        <Border Height="176"
+                                Margin="0,10,0,0"
+                                CornerRadius="6"
+                                Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1">
+                            <Grid>
+                                <TextBlock Text="照片预览"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}" />
+                                <Image Source="{Binding PreviewImage}"
+                                       Stretch="Uniform"
+                                       Margin="6"
+                                       Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="纯本地处理：照片只在本机抠图换底，不会上传到任何服务器。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ② 规格 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="② 规格" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <RadioButton GroupName="IdPhotoSpec"
+                                     Content="一寸（295 × 413）"
+                                     IsChecked="{Binding IsOneInch}" />
+                        <RadioButton GroupName="IdPhotoSpec"
+                                     Content="二寸（413 × 579）"
+                                     Margin="0,6,0,0"
+                                     IsChecked="{Binding IsTwoInch}" />
+
+                        <TextBlock Text="{Binding SpecSummary}"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ③ 底色 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="③ 底色（可多选，一次出多张）" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <CheckBox IsChecked="{Binding RedEnabled}">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Width="14" Height="14" CornerRadius="3" Margin="0,0,6,0"
+                                        Background="#D40000" BorderBrush="#33000000" BorderThickness="1" />
+                                <TextBlock Text="红底" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </CheckBox>
+
+                        <CheckBox IsChecked="{Binding BlueEnabled}" Margin="0,6,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Width="14" Height="14" CornerRadius="3" Margin="0,0,6,0"
+                                        Background="#438EDB" BorderBrush="#33000000" BorderThickness="1" />
+                                <TextBlock Text="蓝底" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </CheckBox>
+
+                        <CheckBox IsChecked="{Binding WhiteEnabled}" Margin="0,6,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Width="14" Height="14" CornerRadius="3" Margin="0,0,6,0"
+                                        Background="#FFFFFF" BorderBrush="#33000000" BorderThickness="1" />
+                                <TextBlock Text="白底" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </CheckBox>
+                    </StackPanel>
+                </Border>
+
+                <!-- ④ 输出位置 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="④ 输出位置" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox Grid.Column="0"
+                                        Text="{Binding OutputDirectory, Mode=OneWay}"
+                                        PlaceholderText="保存到哪个文件夹"
+                                        IsReadOnly="True"
+                                        ToolTip="{Binding OutputDirectory}" />
+                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                       Command="{Binding BrowseOutputCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="文件名形如「张三_一寸_红底.jpg」，同一张照片的三种底色会一起生成。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ⑤ 生成 -->
+                <Border Style="{StaticResource ControlPanel}">
+                    <StackPanel>
+                        <TextBlock Text="⑤ 生成" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                        <TextBlock Text="{Binding EngineStatusText}"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" />
+
+                        <ui:Button Content="预下载图像处理组件"
+                                   Margin="0,10,0,0"
+                                   HorizontalAlignment="Stretch"
+                                   Command="{Binding InstallEngineCommand}"
+                                   IsEnabled="{Binding CanInstallEngine}" />
+
+                        <ui:Button Content="生成证件照"
+                                   Appearance="Primary"
+                                   Margin="0,10,0,0"
+                                   HorizontalAlignment="Stretch"
+                                   IsEnabled="{Binding CanStart}"
+                                   Command="{Binding GenerateCommand}" />
+
+                        <ProgressBar Height="4"
+                                     Margin="0,10,0,0"
+                                     IsIndeterminate="True"
+                                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <ui:Button Content="拼 6 寸相纸"
+                                   Margin="0,10,0,0"
+                                   HorizontalAlignment="Stretch"
+                                   Command="{Binding ComposeSheetCommand}"
+                                   IsEnabled="{Binding CanComposeSheet}" />
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <ui:Button Content="打开图片"
+                                       IsEnabled="{Binding HasResult}"
+                                       Command="{Binding OpenResultCommand}"
+                                       Margin="0,0,8,0" />
+                            <ui:Button Content="打开输出目录"
+                                       Command="{Binding OpenOutputFolderCommand}" />
+                        </StackPanel>
+
+                        <TextBlock Text="首次生成会先装组件并下载抠图模型（共约 320MB），之后就快了。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 右栏：状态 / 结果 / 日志 -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource StatCard}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="状态" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                    <TextBlock Text="{Binding StatusText}"
+                               Style="{StaticResource BodyTextStyle}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" Style="{StaticResource StatCard}" Margin="0,0,0,12"
+                    Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="生成结果" Style="{StaticResource SectionHeaderTextStyle}" />
+
+                    <ListBox ItemsSource="{Binding Results}"
+                             SelectedItem="{Binding SelectedResult}"
+                             MaxHeight="150"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"
+                                           ToolTip="{Binding}"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="4,2" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Style="{StaticResource StatCard}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="处理日志"
+                               Style="{StaticResource SectionHeaderTextStyle}"
+                               Margin="14,12,14,8" />
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Logs}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             Margin="6,0,6,8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"
+                                           Style="{StaticResource CaptionTextStyle}"
+                                           TextWrapping="Wrap"
+                                           Margin="6,2" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

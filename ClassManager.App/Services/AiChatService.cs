@@ -17,6 +17,12 @@ public sealed record AiStreamUpdate(string? ContentDelta, string? ReasoningDelta
 public sealed class AiTurnResult
 {
     public bool Ok { get; init; }
+
+    /// <summary>
+    /// 失败原因是「配额用尽」（所有 key / 所有候选模型都 429）。
+    /// 界面据此提示用户换模型并停止任务，而不是让他对着转圈干等。
+    /// </summary>
+    public bool QuotaExhausted { get; init; }
     public string Content { get; init; } = string.Empty;
     public string Reasoning { get; init; } = string.Empty;
     public IReadOnlyList<AiToolCall> ToolCalls { get; init; } = Array.Empty<AiToolCall>();
@@ -73,6 +79,19 @@ public interface IAiChatService
     /// <summary>配置里的首选模型（界面上「当前模型」初始显示它）。</summary>
     string PrimaryModel { get; }
 
+    /// <summary>
+    /// 可选模型目录（带消耗标注）。空列表表示配置里没写 models，
+    /// 界面应退化成「只显示当前模型」。
+    /// </summary>
+    IReadOnlyList<AiModelOption> AvailableModels { get; }
+
+    /// <summary>
+    /// 用户手动指定的模型 id。设为非空后 <b>只走这一个模型、不再自动 fallback</b> ——
+    /// 用户既然挑了，就该让他自己决定换不换；配额用完时提示他换，而不是偷偷换掉。
+    /// 设为空则回到「首选模型 + 备用链」的自动模式。
+    /// </summary>
+    string PreferredModel { get; set; }
+
     /// <summary>本次运行累计用量。</summary>
     AiUsageTotals SessionUsage { get; }
 
@@ -85,9 +104,41 @@ public interface IAiChatService
 }
 
 /// <summary>内嵌凭据。</summary>
-internal sealed class AiCredentials
+/// <summary>可选模型（带消耗标注，界面上给用户挑）。</summary>
+public sealed class AiModelOption
+{
+    /// <summary>API 里的模型 ID。</summary>
+    public string Id { get; init; } = string.Empty;
+
+    /// <summary>显示名。</summary>
+    public string Label { get; init; } = string.Empty;
+
+    /// <summary>消耗档位：1=低 2=中 3=高。</summary>
+    public int Cost { get; init; } = 1;
+
+    /// <summary>一句话说明。</summary>
+    public string Note { get; init; } = string.Empty;
+
+    /// <summary>消耗标签。</summary>
+    public string CostLabel => Cost switch
+    {
+        >= 3 => "高消耗",
+        2 => "中消耗",
+        _ => "低消耗",
+    };
+
+    /// <summary>下拉框里显示的文字。</summary>
+    public string Display => string.IsNullOrWhiteSpace(Note)
+        ? $"{Label}　[{CostLabel}]"
+        : $"{Label}　[{CostLabel}]　{Note}";
+}
+
+public sealed class AiCredentials
 {
     public string BaseUrl { get; init; } = string.Empty;
+
+    /// <summary>可选模型目录（空则退化成「只有 Model + Fallbacks」的老行为）。</summary>
+    public List<AiModelOption> Models { get; init; } = new();
 
     /// <summary>首选模型。</summary>
     public string Model { get; init; } = string.Empty;
@@ -109,12 +160,16 @@ public sealed class AiChatService : IAiChatService
     private const string CredentialResourceSuffix = "ai.credentials.json";
 
     private readonly HttpClient _http;
-    private readonly AiCredentials _credentials;
+    private AiCredentials _credentials;
     private int _activeKeyIndex;
+    private string _preferredModel = string.Empty;
+    private bool _lastQuotaExhausted;
+    private readonly List<AiModelOption> _availableModels = new();
 
     public AiChatService()
     {
         _credentials = LoadCredentials();
+        BuildAvailableModels();
 
         // 万一服务端对响应做了 gzip/deflate/br 压缩而没被解压，读到的就是乱码；
         // 显式开启自动解压，把这种可能性排除掉。
@@ -137,11 +192,78 @@ public sealed class AiChatService : IAiChatService
     /// <inheritdoc />
     public string ActiveKeyLabel => $"api{_activeKeyIndex + 1}";
 
+    /// <summary>
+    /// 重新读凭据（用户在设置里换了自己的 key 之后调用）。
+    /// </summary>
+    public void ReloadCredentials()
+    {
+        try
+        {
+            _credentials = LoadCredentials();
+            _activeKeyIndex = 0;
+            _lastErrorSummary = string.Empty;
+            BuildAvailableModels();
+        }
+        catch
+        {
+            // 读失败就继续用旧的，不能让 AI 功能整个挂掉
+        }
+    }
+
+    /// <summary>
+    /// 把凭据里的模型目录铺到 <see cref="AvailableModels"/>。
+    /// 没配 models 的老格式就退化成「首选 + 备用」，保证下拉框不为空。
+    /// </summary>
+    private void BuildAvailableModels()
+    {
+        _availableModels.Clear();
+
+        if (_credentials.Models.Count > 0)
+        {
+            _availableModels.AddRange(_credentials.Models);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_credentials.Model))
+        {
+            _availableModels.Add(new AiModelOption
+            {
+                Id = _credentials.Model,
+                Label = _credentials.Model,
+                Cost = 1,
+            });
+        }
+
+        foreach (var fallback in _credentials.Fallbacks)
+        {
+            if (!string.IsNullOrWhiteSpace(fallback)
+                && !_availableModels.Exists(m => string.Equals(m.Id, fallback, StringComparison.OrdinalIgnoreCase)))
+            {
+                _availableModels.Add(new AiModelOption
+                {
+                    Id = fallback,
+                    Label = fallback,
+                    Cost = 1,
+                });
+            }
+        }
+    }
+
     /// <summary>最近一次成功调用实际用的模型（主模型配额耗尽时会变成 fallback 那个）。</summary>
     public string LastUsedModel { get; private set; } = string.Empty;
 
     /// <inheritdoc />
     public string PrimaryModel => _credentials.Model;
+
+    /// <inheritdoc />
+    public IReadOnlyList<AiModelOption> AvailableModels => _availableModels;
+
+    /// <inheritdoc />
+    public string PreferredModel
+    {
+        get => _preferredModel;
+        set => _preferredModel = value ?? string.Empty;
+    }
 
     /// <inheritdoc />
     public AiUsageTotals SessionUsage { get; } = new();
@@ -162,17 +284,28 @@ public sealed class AiChatService : IAiChatService
         // 不轮换的话，deepseek 一 429 整个 AI 办公就瘫了。
         var models = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(_credentials.Model))
+        if (!string.IsNullOrWhiteSpace(_preferredModel))
         {
-            models.Add(_credentials.Model);
+            // 用户手选了模型 → 只走它，不自动换。
+            // 换掉的话用户会觉得「我明明选了，怎么偷偷换了」；
+            // 配额用完应该提示他自己换（QuotaExhausted 标志）。
+            models.Add(_preferredModel);
         }
-
-        foreach (var fallback in _credentials.Fallbacks)
+        else
         {
-            if (!string.IsNullOrWhiteSpace(fallback)
-                && !models.Contains(fallback, StringComparer.OrdinalIgnoreCase))
+            // 自动模式：首选 + 备用链
+            if (!string.IsNullOrWhiteSpace(_credentials.Model))
             {
-                models.Add(fallback);
+                models.Add(_credentials.Model);
+            }
+
+            foreach (var fallback in _credentials.Fallbacks)
+            {
+                if (!string.IsNullOrWhiteSpace(fallback)
+                    && !models.Contains(fallback, StringComparer.OrdinalIgnoreCase))
+                {
+                    models.Add(fallback);
+                }
             }
         }
 
@@ -183,6 +316,7 @@ public sealed class AiChatService : IAiChatService
 
         var modelErrors = new List<string>();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        _lastQuotaExhausted = false;
 
         for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
         {
@@ -230,8 +364,12 @@ public sealed class AiChatService : IAiChatService
         return new AiTurnResult
         {
             Ok = false,
-            Error = "所有模型与 API Key 都不可用（" + string.Join(" / ", modelErrors) + "）。\n"
-                    + _lastErrorSummary,
+            QuotaExhausted = _lastQuotaExhausted,
+            Error = _lastQuotaExhausted
+                ? "所选模型（" + string.Join(" / ", modelErrors) + "）的配额已经用尽。\n"
+                  + "请在上方模型下拉框里换一个模型再试。\n" + _lastErrorSummary
+                : "所有模型与 API Key 都不可用（" + string.Join(" / ", modelErrors) + "）。\n"
+                  + _lastErrorSummary,
         };
     }
 
@@ -299,8 +437,17 @@ public sealed class AiChatService : IAiChatService
                 // 试 6 把 key 只会白烧 5 次请求。直接放弃这个模型，让上层换模型。
                 if (outcome.RateLimited && IsQuotaExhausted(outcome.Error))
                 {
-                    stream?.Report(new AiStreamUpdate(null, null, $"{label} 配额用尽，换下一个模型…"));
+                    // 记一笔「这次失败是配额原因」，上层据此告诉用户「换模型」而不是「检查网络」
+                    _lastQuotaExhausted = true;
+                    stream?.Report(new AiStreamUpdate(null, null, $"{label} 配额用尽…"));
                     return null;
+                }
+
+                // 只要出现过「非配额」类失败（网络、鉴权、超时），就不能再把整次失败
+                // 归因为配额 —— 否则用户会被误导去换模型，换了也没用。
+                if (!outcome.RateLimited || !IsQuotaExhausted(outcome.Error))
+                {
+                    _lastQuotaExhausted = false;
                 }
 
                 if (!outcome.Retryable || attempt == maxAttemptsPerKey - 1)
@@ -413,6 +560,19 @@ public sealed class AiChatService : IAiChatService
                 - 先列清单让用户看清楚要删什么，别直接删；
                 - 带删除操作的脚本会先弹确认框给用户过目（这是设计如此，不是你出错了）；
                 - 永远不要删系统目录、用户主目录、桌面、下载、文档这些地方。
+
+                长任务要先列计划（重要）：
+                如果一件事需要多步才能完成（「把这学期的成绩整理成报表」「把这份试卷改成课件」
+                「帮我清理磁盘」「分析这批数据」这类），**先给一个 3~6 条的计划**：
+
+                > 我打算这么做：
+                > 1. …
+                > 2. …
+                > 3. …
+
+                然后**逐条执行**，每完成一条就在回复里标一句进度（例如「第 2 步完成：已提取 45 个文件」）。
+                不要闷头做十几分钟才说话 —— 用户不知道你在干什么会以为卡死了。
+                简单问题（一句话能答、一次工具调用能解决）不要列计划，直接做。
 
                 工作方式：
                 1. 需要动手就调工具，不要只描述步骤。
@@ -883,34 +1043,12 @@ public sealed class AiChatService : IAiChatService
 
     private static AiCredentials LoadCredentials()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var name = assembly.GetManifestResourceNames()
-            .FirstOrDefault(n => n.EndsWith(CredentialResourceSuffix, StringComparison.OrdinalIgnoreCase));
+        // 凭据来源有两层：
+        //   ① %AppData%\ClassManager\ai-credentials.json（用户自填，明文，优先级高）
+        //   ② 程序内置的 AES 密文（credentials.enc，sk- 扫不出来）
+        // 具体逻辑都在 AiCredentialVault 里，这里只管拿结果。
+        var json = AiCredentialVault.ReadJson();
 
-        if (name is null)
-        {
-            return new AiCredentials();
-        }
-
-        using var stream = assembly.GetManifestResourceStream(name);
-        if (stream is null)
-        {
-            return new AiCredentials();
-        }
-
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        var json = reader.ReadToEnd();
-
-        try
-        {
-            return JsonSerializer.Deserialize<AiCredentials>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-            }) ?? new AiCredentials();
-        }
-        catch
-        {
-            return new AiCredentials();
-        }
+        return AiCredentialVault.Parse(json) ?? new AiCredentials();
     }
 }

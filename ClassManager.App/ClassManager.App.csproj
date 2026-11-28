@@ -39,7 +39,8 @@
          运行期解压到 %LocalAppData%\ClassManager\engine\，这样单文件 exe 分发不被破坏。 -->
     <EmbeddedResource Include="Assets\engine\exam2ppt-payload.zip" />
     <!-- AI 办公的内置凭据（OpenAI 兼容端点 + 模型 + 多把 key），运行期从程序集读取。 -->
-    <EmbeddedResource Include="Assets\ai\credentials.json" />
+    <!-- 加密后的凭据（明文 json 只留在本机，不进仓库） -->
+    <EmbeddedResource Include="Assets\ai\credentials.enc" />
 
     <!-- 试卷格式规范：内置一份，AI 办公时释放到工作区供 read_file 读取 -->
     <EmbeddedResource Include="Assets\ai\exam-spec.md" />

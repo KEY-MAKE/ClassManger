@@ -24,6 +24,15 @@ public static class AppServices
     /// </summary>
     public static event Action? RollCallChanged;
 
+    /// <summary>重新加载 AI 凭据（用户换了自己的 key 之后调）。</summary>
+    public static void ReloadAiCredentials()
+    {
+        if (Ai is AiChatService concrete)
+        {
+            concrete.ReloadCredentials();
+        }
+    }
+
     /// <summary>广播点名状态变化。</summary>
     public static void NotifyRollCallChanged()
     {
@@ -74,6 +83,9 @@ public static class AppServices
     /// <summary>可选的高质量 PDF 解析引擎（MinerU）。未安装时为 null 状态，功能自动降级。</summary>
     public static MineruService Mineru { get; private set; } = null!;
 
+    /// <summary>证件照生成（本地抠图 + 换底色，依赖按需安装）。</summary>
+    public static IIdPhotoService IdPhoto { get; private set; } = null!;
+
     public static NavigationPageProvider PageProvider { get; private set; } = null!;
 
     /// <summary>是否已完成装配。</summary>
@@ -114,6 +126,7 @@ public static class AppServices
         Update = new UpdateService();
         UpdateDownload = new UpdateDownloadManager(Update);
         Mineru = new MineruService();
+        IdPhoto = new IdPhotoService();
         PageProvider = new NavigationPageProvider();
 
         IsInitialized = true;

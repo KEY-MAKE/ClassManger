@@ -30,7 +30,6 @@ public partial class FloatingBallWindow : Window
     private bool _moved;
     private double _dragStartLeft;
     private double _dragStartTop;
-    private Point _grabOffset;
     private DispatcherTimer? _nameTimer;
     private RollCallResultPopup? _resultPopup;
     private DispatcherTimer? _topmostGuard;

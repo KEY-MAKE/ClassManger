@@ -99,6 +99,8 @@ public sealed class AiAnomalyRoundTests : IDisposable
         public string ActiveKeyLabel => "api1";
         public string LastUsedModel => "fake-model";
         public string PrimaryModel => "fake-model";
+        public IReadOnlyList<AiModelOption> AvailableModels => Array.Empty<AiModelOption>();
+        public string PreferredModel { get; set; } = string.Empty;
 
         public AiUsageTotals SessionUsage { get; } = new();
 
