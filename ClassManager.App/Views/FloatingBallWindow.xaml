@@ -114,10 +114,7 @@
         <Grid x:Name="BallLayer"
               Width="72" Height="72"
               Cursor="Hand"
-              PreviewMouseLeftButtonDown="OnBallMouseDown"
-              PreviewMouseMove="OnBallMouseMove"
-              PreviewMouseLeftButtonUp="OnBallMouseUp"
-              PreviewMouseRightButtonDown="OnBallRightDown">
+              MouseLeftButtonDown="OnBallMouseDown">
 
             <!-- 左键才是「打开罗盘」；右键只留一个「隐藏」，
                  免得和罗盘里的功能重复、让人以为要用右键操作 -->

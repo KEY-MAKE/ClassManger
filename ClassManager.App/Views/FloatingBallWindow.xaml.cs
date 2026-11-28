@@ -27,7 +27,9 @@ public partial class FloatingBallWindow : Window
     private const double ExpandedSize = 340;
 
     private bool _expanded;
-    private bool _dragging;
+    private bool _moved;
+    private double _dragStartLeft;
+    private double _dragStartTop;
     private Point _grabOffset;
     private DispatcherTimer? _nameTimer;
     private DispatcherTimer? _topmostGuard;
@@ -47,6 +49,15 @@ public partial class FloatingBallWindow : Window
         var area = SystemParameters.WorkArea;
         Left = area.Right - CollapsedSize - 36;
         Top = area.Bottom - CollapsedSize - 90;
+
+        // DragMove 期间靠位置变化判断「到底有没有拖动」
+        LocationChanged += (_, _) =>
+        {
+            if (Math.Abs(Left - _dragStartLeft) > 2 || Math.Abs(Top - _dragStartTop) > 2)
+            {
+                _moved = true;
+            }
+        };
 
         Loaded += (_, _) =>
         {
@@ -84,67 +95,45 @@ public partial class FloatingBallWindow : Window
         }
     }
 
+    /// <summary>
+    /// 按下 → 交给系统的窗口拖动循环（DragMove），松手后判断是「拖动」还是「单击」。
+    /// <para>
+    /// <b>为什么不用 CaptureMouse</b>：上一版手动 CaptureMouse + 等 MouseUp 释放，
+    /// 实测 MouseUp 没到，捕获就一直挂着 —— 鼠标被这个 72×72 的小窗独占，
+    /// 整个主界面都点不动，而右键（走系统消息）却能正常弹菜单。
+    /// DragMove 是系统级的移动循环，松手必释放，不会有这种残留。
+    /// </para>
+    /// </summary>
     private void OnBallMouseDown(object sender, MouseButtonEventArgs e)
     {
-        Log($"DOWN  button={e.ChangedButton} pos={e.GetPosition(this)}");
+        Log($"DOWN  left={Left:F0} top={Top:F0}");
 
-        var screen = PointToScreen(e.GetPosition(this));
-        _grabOffset = new Point(screen.X - Left, screen.Y - Top);
+        _dragStartLeft = Left;
+        _dragStartTop = Top;
+        _moved = false;
 
-        _dragging = false;
-        CaptureMouse();
         e.Handled = true;
-    }
 
-    private void OnBallMouseMove(object sender, MouseEventArgs e)
-    {
-        if (e.LeftButton != MouseButtonState.Pressed || !IsMouseCaptured)
+        try
         {
-            return;
+            // 阻塞到鼠标松开；期间窗口跟着鼠标走
+            DragMove();
+        }
+        catch
+        {
+            // 极少数情况（窗口未激活等）会抛，忽略即可
         }
 
-        var now = PointToScreen(e.GetPosition(this));
+        // 走到这里说明鼠标已经松开了
+        Log($"AFTER-DRAG  moved={_moved} left={Left:F0} top={Top:F0}");
 
-        if (!_dragging
-            && (Math.Abs(now.X - Left - _grabOffset.X) > 3
-                || Math.Abs(now.Y - Top - _grabOffset.Y) > 3))
+        if (_moved)
         {
-            _dragging = true;
-            Log("DRAG  start");
-        }
-
-        if (!_dragging)
-        {
-            return;
-        }
-
-        Left = now.X - _grabOffset.X;
-        Top = now.Y - _grabOffset.Y;
-    }
-
-    private void OnBallMouseUp(object sender, MouseButtonEventArgs e)
-    {
-        Log($"UP    button={e.ChangedButton} dragging={_dragging}");
-
-        if (IsMouseCaptured)
-        {
-            ReleaseMouseCapture();
-        }
-
-        if (_dragging)
-        {
-            _dragging = false;
-            return;
+            return;   // 拖动过，不当成点击
         }
 
         Log("TOGGLE");
         Toggle();
-        e.Handled = true;
-    }
-
-    private void OnBallRightDown(object sender, MouseButtonEventArgs e)
-    {
-        Log("RIGHT down（右键菜单走系统默认）");
     }
 
     // ---------------- 展开 / 收起 ----------------
