@@ -544,12 +544,34 @@ public sealed partial class IdPhotoViewModel : ObservableObject
         }
     }
 
+    /// <summary>切到一寸（同时取消二寸，两者互斥）。</summary>
+    [RelayCommand]
+    private void UseOneInch()
+    {
+        IsOneInch = true;
+        IsTwoInch = false;
+    }
+
+    /// <summary>切到二寸（同时取消一寸）。</summary>
+    [RelayCommand]
+    private void UseTwoInch()
+    {
+        IsTwoInch = true;
+        IsOneInch = false;
+    }
+
     /// <summary>
-    /// 精细抠图（RMBG 2.0）。默认开 —— 头发边缘明显更干净，
-    /// 代价是首次要下 977MB 模型。
+    /// 精细抠图。默认开 —— 边缘明显更干净，代价是慢一些。
     /// </summary>
     [ObservableProperty]
     private bool _isFineMatting = true;
+
+    /// <summary>当前精度档的说明文字。</summary>
+    public string MattingHint => IsFineMatting
+        ? "当前：精细模式（ISNet + 边缘精修），单张约 10~20 秒。"
+        : "当前：标准模式（U2Net），单张约 4 秒，边缘一般。";
+
+    partial void OnIsFineMattingChanged(bool value) => OnPropertyChanged(nameof(MattingHint));
 
     private IdPhotoSpec BuildSpec()
     {

@@ -78,13 +78,17 @@
                     <StackPanel>
                         <TextBlock Text="② 规格" Style="{StaticResource SectionHeaderTextStyle}" />
 
+                        <!-- 单向绑定 + 命令：RadioButton 组会自动取消对方，
+                             双向绑两个 bool 时回写会互相打架，点不动。 -->
                         <RadioButton GroupName="IdPhotoSpec"
                                      Content="一寸（295 × 413）"
-                                     IsChecked="{Binding IsOneInch}" />
+                                     IsChecked="{Binding IsOneInch, Mode=OneWay}"
+                                     Command="{Binding UseOneInchCommand}" />
                         <RadioButton GroupName="IdPhotoSpec"
                                      Content="二寸（413 × 579）"
                                      Margin="0,6,0,0"
-                                     IsChecked="{Binding IsTwoInch}" />
+                                     IsChecked="{Binding IsTwoInch, Mode=OneWay}"
+                                     Command="{Binding UseTwoInchCommand}" />
 
                         <TextBlock Text="{Binding SpecSummary}"
                                    Style="{StaticResource CaptionTextStyle}"
@@ -102,9 +106,15 @@
                              同一 GroupName 的 RadioButton 双向绑同一个 bool 时，
                              选中一个会自动取消另一个，两边互相回写形成无限递归，
                              实测会把布局线程卡死（InitializeComponent 之后 Loaded 永不触发）。 -->
-                        <CheckBox Content="精细抠图（边缘更干净，首次下 170MB）"
+                        <CheckBox Content="精细模式（边缘更干净，速度略慢）"
+                                  Margin="0,0,0,4"
                                   IsChecked="{Binding IsFineMatting}"
-                                  ToolTip="取消勾选则用标准档：最快，但头发边缘一般" />
+                                  ToolTip="不勾选 = 标准模式：最快，但头发边缘一般" />
+
+                        <TextBlock Text="{Binding MattingHint}"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap" />
 
                         <TextBlock Text="人像按原图构图完整保留，不裁切。"
                                    Style="{StaticResource CaptionTextStyle}"

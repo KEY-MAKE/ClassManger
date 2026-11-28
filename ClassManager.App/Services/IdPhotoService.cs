@@ -271,7 +271,9 @@ public sealed class IdPhotoService : IIdPhotoService
             await PrefetchFineModelAsync(progress, ct).ConfigureAwait(false);
         }
 
-        progress?.Report("正在抠图并换底色（CPU 上约几秒到十几秒）…");
+        progress?.Report(spec.Matting == IdPhotoMatting.Fine
+            ? "正在抠图并精修边缘（精细模式约 15 秒/张）…"
+            : "正在抠图并换底色（标准模式约 5 秒/张）…");
 
         var script = BuildGenerateScript(srcImage, outDir, spec);
 
@@ -414,7 +416,22 @@ public sealed class IdPhotoService : IIdPhotoService
             from rembg import remove, new_session
             emit('STEP|正在加载抠图模型（' + model_name + '）…')
             session = new_session(model_name)
-            cut = remove(raw, session=session)
+
+            if model_name != 'u2net':
+                # 精细模式：alpha matting 做 Trimap 精修（pymatting），
+                # 专门解决发丝半透明处透出底色的问题 —— 实测能消掉翘发边缘的红色尖角。
+                # 代价是慢一倍左右（10s → 16s），换来边缘干净。
+                emit('STEP|正在精修边缘（alpha matting）…')
+                cut = remove(
+                    raw,
+                    session=session,
+                    alpha_matting=True,
+                    alpha_matting_foreground_threshold=240,
+                    alpha_matting_background_threshold=10,
+                    alpha_matting_erode_size=10,
+                )
+            else:
+                cut = remove(raw, session=session)
             fg = Image.open(io.BytesIO(cut)).convert('RGBA')
 
             # 连通域过滤：只保留面积最大的一块（人物主体），
@@ -438,13 +455,15 @@ public sealed class IdPhotoService : IIdPhotoService
             except Exception as exc:
                 emit('WARN|残留清理跳过：' + str(exc))
 
-            # 边缘轻微羽化：把硬边磨掉 1px，减少锯齿（证件照缩小后尤其明显）
-            try:
-                from PIL import ImageFilter
-                a = fg.getchannel('A').filter(ImageFilter.GaussianBlur(0.6))
-                fg.putalpha(a)
-            except Exception:
-                pass
+            # 标准模式（U2Net 无 matting）边缘偏硬，补一点羽化；
+            # 精细模式的 alpha matting 自带柔边，再模糊只会发虚。
+            if model_name == 'u2net':
+                try:
+                    from PIL import ImageFilter
+                    a = fg.getchannel('A').filter(ImageFilter.GaussianBlur(0.6))
+                    fg.putalpha(a)
+                except Exception:
+                    pass
 
             # 裁掉抠图后四周全透明的空白，后续按人像真实包围盒构图
             bbox = fg.getchannel('A').getbbox()
