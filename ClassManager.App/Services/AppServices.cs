@@ -12,6 +12,28 @@ public static class AppServices
 
     public static IRollCallService RollCall { get; private set; } = null!;
 
+    /// <summary>
+    /// 点名状态变了（悬浮球点了名 / 复位了）。
+    /// <para>
+    /// 悬浮球和点名页共用同一个 <see cref="RollCall"/> 实例，但页面上的「已点」标记
+    /// 是 VM 自己维护的，不刷新就会显示成旧状态。点名方广播这个事件，页面收到后重刷。
+    /// </para>
+    /// </summary>
+    public static event Action? RollCallChanged;
+
+    /// <summary>广播点名状态变化。</summary>
+    public static void NotifyRollCallChanged()
+    {
+        try
+        {
+            RollCallChanged?.Invoke();
+        }
+        catch
+        {
+            // 订阅方出错不能影响点名本身
+        }
+    }
+
     public static ISeatingService Seating { get; private set; } = null!;
 
     public static IExportService Export { get; private set; } = null!;

@@ -157,6 +157,9 @@ public partial class App : Application
         }
     }
 
+    /// <summary>桌面悬浮球（放幻灯片时点名用）。主窗口关闭时随之关闭。</summary>
+    private FloatingBallWindow? _floatingBall;
+
     private void ShowMainWindow(string? importPath)
     {
         var viewModel = new MainWindowViewModel();
@@ -166,6 +169,32 @@ public partial class App : Application
         _mainWindow = window;
         MainWindow = window;
         window.Show();
+
+        // 悬浮球：不设 Owner —— 设了会跟着主窗口一起最小化，
+        // 而它就是要在「主窗口最小化 + PPT 全屏」时还能点。
+        try
+        {
+            _floatingBall = new FloatingBallWindow();
+            _floatingBall.Show();
+        }
+        catch
+        {
+            // 悬浮球起不来不能影响主流程
+            _floatingBall = null;
+        }
+
+        window.Closed += (_, _) =>
+        {
+            try
+            {
+                _floatingBall?.Close();
+                _floatingBall = null;
+            }
+            catch
+            {
+                // 忽略
+            }
+        };
 
         // 主界面（含点名页）已就绪后再导入，保证 RosterImported 事件被页面订阅
         if (!string.IsNullOrWhiteSpace(importPath))

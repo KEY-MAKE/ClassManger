@@ -59,6 +59,9 @@ public sealed partial class RollCallViewModel : ObservableObject
         FilteredStudents.Filter = FilterPredicate;
 
         AppServices.RosterImported += OnRosterImported;
+
+        // 悬浮球点名后，把页面上的「已点」标记刷一遍
+        AppServices.RollCallChanged += OnRollCallChangedExternally;
         LoadFromService();
     }
 
@@ -184,6 +187,19 @@ public sealed partial class RollCallViewModel : ObservableObject
         }
 
         UpdateStats();
+    }
+
+    /// <summary>外部（悬浮球）点了名，刷新一次页面状态。</summary>
+    private void OnRollCallChangedExternally()
+    {
+        try
+        {
+            RefreshCalledStates();
+        }
+        catch
+        {
+            // 页面可能还没准备好
+        }
     }
 
     private void RefreshCalledStates()
