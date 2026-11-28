@@ -23,7 +23,7 @@ public sealed partial class Exam2PptService : IExam2PptService
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     /// <inheritdoc />
-    public string PayloadVersion => "1.0.0";
+    public string PayloadVersion => "1.1.0";
 
     /// <inheritdoc />
     public string EngineRoot { get; }
@@ -156,6 +156,10 @@ public sealed partial class Exam2PptService : IExam2PptService
         startInfo.ArgumentList.Add(options.AnswerDocxPath);
         startInfo.ArgumentList.Add("--out");
         startInfo.ArgumentList.Add(outputPath);
+
+        // 文科/理科模板：引擎里切换整套配色与字号
+        startInfo.ArgumentList.Add("--style");
+        startInfo.ArgumentList.Add(string.IsNullOrWhiteSpace(options.Style) ? "liberal" : options.Style);
 
         if (!string.IsNullOrWhiteSpace(options.TemplatePath))
         {

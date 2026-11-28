@@ -117,6 +117,19 @@
                     <StackPanel>
                         <TextBlock Text="③ 生成内容" Style="{StaticResource SectionHeaderTextStyle}" />
 
+                        <TextBlock Text="课件风格" Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+
+                        <RadioButton Content="文科模板（语文 / 英语 · 深红）"
+                                     GroupName="PptStyle"
+                                     Margin="0,0,0,4"
+                                     IsChecked="{Binding IsScienceStyle, Converter={StaticResource InverseBooleanConverter}}" />
+
+                        <RadioButton Content="理科模板（数学 / 物理 / 化学 · 深蓝）"
+                                     GroupName="PptStyle"
+                                     Margin="0,0,0,10"
+                                     IsChecked="{Binding IsScienceStyle}" />
+
                         <CheckBox Content="生成前用 AI 按规范整理试卷（推荐）"
                                   IsChecked="{Binding UseAiNormalize}"
                                   Margin="0,0,0,4" />

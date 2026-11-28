@@ -203,6 +203,16 @@ public sealed partial class Exam2PptViewModel : ObservableObject
     [ObservableProperty]
     private bool _useAiNormalize = true;
 
+    /// <summary>
+    /// 用理科模板（数学 / 物理 / 化学）。
+    /// <para>
+    /// 文科（语文 / 英语）用深红 + 米黄 + 楷体，理科用深藏蓝 + 冷白 + 宋体。
+    /// 默认文科，保持和以前一样的观感。
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    private bool _isScienceStyle;
+
     /// <summary>打开背景设置窗口（预览 + 选择图片 / 使用默认背景）。</summary>
     [RelayCommand]
     private async Task ConfigureBackgroundAsync()
@@ -304,6 +314,7 @@ public sealed partial class Exam2PptViewModel : ObservableObject
                 OutputPath = OutputPath,
                 TemplatePath = string.IsNullOrWhiteSpace(TemplatePath) ? null : TemplatePath,
                 BackgroundImagePath = string.IsNullOrWhiteSpace(BackgroundImagePath) ? null : BackgroundImagePath,
+                Style = IsScienceStyle ? "science" : "liberal",
                 SkipMaterial = !GenerateMaterial,
                 SkipGuide = !GenerateGuide,
                 SkipAnalysis = !WriteAnalysis,

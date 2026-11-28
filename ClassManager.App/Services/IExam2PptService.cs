@@ -18,6 +18,11 @@ public sealed class Exam2PptOptions
     /// <summary>自定义背景图（可选）；为空时使用引擎自带的默认背景。</summary>
     public string? BackgroundImagePath { get; init; }
 
+    /// <summary>
+    /// 课件风格："liberal"（文科，深红金，默认）/ "science"（理科，深藏蓝）。
+    /// </summary>
+    public string Style { get; init; } = "liberal";
+
     /// <summary>不生成阅读材料页。</summary>
     public bool SkipMaterial { get; init; }
 

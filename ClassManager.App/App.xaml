@@ -17,6 +17,7 @@
             </ResourceDictionary.MergedDictionaries>
 
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
             <conv:CountToVisibilityConverter x:Key="CountToVisibilityConverter" />
             <conv:BoolToSeatedBrushConverter x:Key="BoolToSeatedBrushConverter" />
             <conv:EnumToBooleanConverter x:Key="EnumToBooleanConverter" />
