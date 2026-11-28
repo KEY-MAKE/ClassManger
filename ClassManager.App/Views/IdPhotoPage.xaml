@@ -24,15 +24,26 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ui:TextBox Grid.Column="0"
-                                        Text="{Binding SourceImagePath, Mode=OneWay}"
-                                        PlaceholderText="选择一张正面免冠照片（也可以直接拖进来）"
+                                        Text="{Binding BatchSummary, Mode=OneWay}"
+                                        PlaceholderText="可多选，批量换底（也能拖进来）"
                                         IsReadOnly="True"
-                                        ToolTip="{Binding SourceImagePath}" />
-                            <ui:Button Grid.Column="1" Content="浏览…" Margin="8,0,0,0"
+                                        ToolTip="{Binding BatchSummary}" />
+                            <ui:Button Grid.Column="1" Content="选择照片…" Margin="8,0,0,0"
                                        Command="{Binding BrowseImageCommand}" />
+                            <ui:Button Grid.Column="2" Content="清空" Margin="6,0,0,0"
+                                       Appearance="Secondary"
+                                       Command="{Binding ClearSourcesCommand}"
+                                       ToolTip="清空待处理列表" />
                         </Grid>
+
+                        <TextBlock Text="支持一次选多张：每张都会出所有勾选的底色，文件名自动区分。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
 
                         <Border Height="176"
                                 Margin="0,10,0,0"

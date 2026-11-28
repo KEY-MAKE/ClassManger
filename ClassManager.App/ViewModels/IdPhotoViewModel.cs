@@ -180,14 +180,22 @@ public sealed partial class IdPhotoViewModel : ObservableObject
             : "首次使用需安装图像处理组件（约 150MB，另下载 170MB 抠图模型）";
     }
 
+    /// <summary>批量待处理的照片（第一张同时作为预览）。</summary>
+    public ObservableCollection<string> SourceImages { get; } = new();
+
+    /// <summary>批量摘要（显示在按钮下方）。</summary>
+    [ObservableProperty]
+    private string _batchSummary = string.Empty;
+
     [RelayCommand]
     private void BrowseImage()
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择人物照片",
+            Title = "选择人物照片（可多选，批量换底）",
             Filter = "图片 (*.jpg;*.jpeg;*.png;*.bmp;*.webp)|*.jpg;*.jpeg;*.png;*.bmp;*.webp|所有文件 (*.*)|*.*",
             CheckFileExists = true,
+            Multiselect = true,
         };
 
         var last = AppServices.Settings.Current.LastImportDirectory;
@@ -199,8 +207,55 @@ public sealed partial class IdPhotoViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
-            SetSource(dialog.FileName);
+            SetSources(dialog.FileNames);
         }
+    }
+
+    /// <summary>批量载入（多选 / 拖拽多张）。</summary>
+    public void SetSources(IEnumerable<string> paths)
+    {
+        SourceImages.Clear();
+
+        foreach (var path in paths)
+        {
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path) && !SourceImages.Contains(path))
+            {
+                SourceImages.Add(path);
+            }
+        }
+
+        Results.Clear();
+        SelectedResult = null;
+        Logs.Clear();
+
+        if (SourceImages.Count == 0)
+        {
+            BatchSummary = string.Empty;
+            return;
+        }
+
+        SourceImagePath = SourceImages[0];
+        LoadPreview(SourceImages[0]);
+
+        BatchSummary = SourceImages.Count == 1
+            ? Path.GetFileName(SourceImages[0])
+            : $"已选 {SourceImages.Count} 张：{Path.GetFileName(SourceImages[0])} 等";
+
+        RaiseCommandState();
+    }
+
+    /// <summary>清空待处理列表。</summary>
+    [RelayCommand]
+    private void ClearSources()
+    {
+        SourceImages.Clear();
+        SourceImagePath = string.Empty;
+        PreviewImage = null;
+        HasPreview = false;
+        Results.Clear();
+        SelectedResult = null;
+        BatchSummary = string.Empty;
+        RaiseCommandState();
     }
 
     /// <summary>供拖拽调用。</summary>
@@ -210,6 +265,10 @@ public sealed partial class IdPhotoViewModel : ObservableObject
         {
             return;
         }
+
+        SourceImages.Clear();
+        SourceImages.Add(path);
+        BatchSummary = Path.GetFileName(path);
 
         SourceImagePath = path;
         Results.Clear();
@@ -303,13 +362,29 @@ public sealed partial class IdPhotoViewModel : ObservableObject
         }
     }
 
+    private static void Diag(string message)
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), "cm_idphoto.log");
+            File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {message}\n", new System.Text.UTF8Encoding(false));
+        }
+        catch
+        {
+            // 忽略
+        }
+    }
+
     [RelayCommand]
     private async Task GenerateAsync()
     {
         if (!CanStart)
         {
+            Diag($"CanStart=false，跳过（busy={IsBusy}, engineInstalling={IsInstallingEngine}）");
             return;
         }
+
+        Diag("GenerateAsync 开始");
 
         var spec = BuildSpec();
 
@@ -330,28 +405,57 @@ public sealed partial class IdPhotoViewModel : ObservableObject
             AppendLog($"规格：{spec.Name}（{spec.Width}×{spec.Height}），底色："
                      + string.Join("、", spec.Backgrounds.Select(IdPhotoSpec.SuffixOf)));
 
-            var result = await _service
-                .GenerateAsync(SourceImagePath, OutputDirectory, spec, progress, CancellationToken.None)
-                .ConfigureAwait(true);
+            // 批量：优先用多选列表；只有单张时退化成单元素列表
+            var targets = SourceImages.Count > 0
+                ? SourceImages.ToList()
+                : (string.IsNullOrWhiteSpace(SourceImagePath) ? new List<string>() : new List<string> { SourceImagePath });
 
-            if (!result.Ok)
+            if (targets.Count == 0)
             {
-                StatusText = "生成失败";
-                AppendLog("✗ " + result.Message);
+                StatusText = "请先选择照片";
+                IsBusy = false;
                 return;
             }
 
-            foreach (var path in result.OutputPaths)
+            var okCount = 0;
+            var failCount = 0;
+
+            for (var index = 0; index < targets.Count; index++)
             {
-                Results.Add(path);
-                AppendLog("· " + path);
+                var source = targets[index];
+                var tag = targets.Count > 1 ? $"[{index + 1}/{targets.Count}] " : string.Empty;
+
+                AppendLog($"{tag}—— {Path.GetFileName(source)} ——");
+                StatusText = $"{tag}正在处理 {Path.GetFileName(source)}…";
+
+                var result = await _service
+                    .GenerateAsync(source, OutputDirectory, spec, progress, CancellationToken.None)
+                    .ConfigureAwait(true);
+
+                if (!result.Ok)
+                {
+                    failCount++;
+                    AppendLog($"{tag}✗ 失败：{result.Message}");
+                    continue;
+                }
+
+                okCount++;
+
+                foreach (var path in result.OutputPaths)
+                {
+                    Results.Add(path);
+                    AppendLog($"{tag}· " + Path.GetFileName(path));
+                }
+
+                SelectedResult = Results.FirstOrDefault();
+                OnPropertyChanged(nameof(HasResult));
             }
 
-            SelectedResult = Results.FirstOrDefault();
-            OnPropertyChanged(nameof(HasResult));
+            StatusText = failCount == 0
+                ? $"全部完成（{okCount} 张照片）"
+                : $"完成 {okCount} 张，失败 {failCount} 张";
 
-            StatusText = "生成完成";
-            AppendLog("✓ " + result.Message);
+            AppendLog($"✓ 共生成 {Results.Count} 个文件（{okCount} 成功 / {failCount} 失败）");
 
             RefreshEngineState();
 
@@ -359,7 +463,7 @@ public sealed partial class IdPhotoViewModel : ObservableObject
             {
                 AppServices.Settings.Current.LastExportDirectory = OutputDirectory;
                 AppServices.Settings.Current.LastImportDirectory =
-                    Path.GetDirectoryName(SourceImagePath) ?? AppServices.Settings.Current.LastImportDirectory;
+                    Path.GetDirectoryName(targets[0]) ?? AppServices.Settings.Current.LastImportDirectory;
                 AppServices.Settings.Save();
             }
             catch
@@ -374,10 +478,12 @@ public sealed partial class IdPhotoViewModel : ObservableObject
         {
             StatusText = "生成出错";
             AppendLog("✗ " + ex.Message);
+            Diag("EX " + ex.GetType().Name + ": " + ex.Message);
         }
         finally
         {
             IsBusy = false;
+            Diag("GenerateAsync 结束");
         }
     }
 
