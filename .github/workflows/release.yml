@@ -25,6 +25,25 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: 生成 AI 凭据（从 Secrets，不落仓库）
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET=ClassManager.App/Assets/ai/credentials.json
+          mkdir -p "$(dirname "$TARGET")"
+
+          SECRET='${{ secrets.AI_CREDENTIALS_JSON }}'
+
+          if [ -z "$SECRET" ]; then
+            echo "::warning::AI_CREDENTIALS_JSON 未配置 —— 构建出的 exe 不含 API Key，AI 功能需要用户自己填"
+            printf '%s' '{"baseUrl":"https://discovery-api.intern-ai.org.cn/v1","model":"deepseek-v4.1-flash-1017","fallbacks":[],"keys":[]}' > "$TARGET"
+          else
+            printf '%s' "$SECRET" > "$TARGET"
+          fi
+
+          echo "credentials.json 已生成：$(wc -c < "$TARGET") 字节"
+
       - name: 构建单文件 exe
         run: |
           # 版本号必须用 tag，否则 exe 内部版本和 tag 对不上：

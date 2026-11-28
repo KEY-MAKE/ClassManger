@@ -28,3 +28,7 @@ docs/*.exe
 
 # WPF 编译期临时工程文件（不该进仓库）
 *_wpftmp.csproj
+
+# AI 凭据：绝不进仓库（公开仓库等于把 key 挂大街上）
+# 本地保留这个文件用于构建；GitHub Actions 从 Secrets 生成
+ClassManager.App/Assets/ai/credentials.json
