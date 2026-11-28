@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -48,37 +49,47 @@ public partial class IdPhotoPage : Page
 
     private void OnDragOver(object sender, DragEventArgs e)
     {
-        e.Effects = TryGetImage(e) is null ? DragDropEffects.None : DragDropEffects.Copy;
+        e.Effects = TryGetImages(e).Count == 0 ? DragDropEffects.None : DragDropEffects.Copy;
         e.Handled = true;
     }
 
     private void OnDrop(object sender, DragEventArgs e)
     {
-        var path = TryGetImage(e);
+        var paths = TryGetImages(e);
 
-        if (path is null)
+        if (paths.Count == 0)
         {
             return;
         }
 
-        ViewModel?.SetSource(path);
+        // 一次拖进来的所有图片都收下，不再只取第一张
+        ViewModel?.AppendSources(paths);
         e.Handled = true;
     }
 
-    private static string? TryGetImage(DragEventArgs e)
+    private static List<string> TryGetImages(DragEventArgs e)
     {
+        var result = new List<string>();
+
         if (!e.Data.GetDataPresent(DataFormats.FileDrop))
         {
-            return null;
+            return result;
         }
 
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files)
         {
-            return null;
+            return result;
         }
 
-        return files.FirstOrDefault(f =>
-            ImageExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase)
-            && File.Exists(f));
+        foreach (var file in files)
+        {
+            if (ImageExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase)
+                && File.Exists(file))
+            {
+                result.Add(file);
+            }
+        }
+
+        return result;
     }
 }

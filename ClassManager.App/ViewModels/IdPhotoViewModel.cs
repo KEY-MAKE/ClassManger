@@ -207,21 +207,50 @@ public sealed partial class IdPhotoViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
-            SetSources(dialog.FileNames);
+            var picked = dialog.FileNames ?? Array.Empty<string>();
+            Diag($"浏览返回 {picked.Length} 个文件（multiselect={dialog.Multiselect}）："
+                 + string.Join(" | ", picked.Select(Path.GetFileName)));
+            SetSources(picked);
         }
     }
 
     /// <summary>批量载入（多选 / 拖拽多张）。</summary>
     public void SetSources(IEnumerable<string> paths)
     {
-        SourceImages.Clear();
+        // 兼容入口：语义与 AppendSources 一致（累加），避免「多选后被覆盖成一张」
+        AppendSources(paths);
+    }
+
+    /// <summary>
+    /// 往待处理列表里追加照片（已存在的不重复加）。
+    /// <para>
+    /// 用累加而不是替换：用户可能先选 3 张、再从另一个文件夹补 2 张；
+    /// 之前的「清空再填」会让后一次选择把前面的全冲掉，表现就是「怎么选都只有一张」。
+    /// 要重来请点「清空」。
+    /// </para>
+    /// </summary>
+    public void AppendSources(IEnumerable<string> paths)
+    {
+        var added = 0;
+        Diag($"AppendSources 收到 {paths.Count()} 个路径，当前列表 {SourceImages.Count} 张");
 
         foreach (var path in paths)
         {
-            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path) && !SourceImages.Contains(path))
+            if (!string.IsNullOrWhiteSpace(path)
+                && File.Exists(path)
+                && !SourceImages.Contains(path, StringComparer.OrdinalIgnoreCase))
             {
                 SourceImages.Add(path);
+                added++;
             }
+        }
+
+        if (added == 0 && SourceImages.Count > 0)
+        {
+            // 全是重复的，只更新提示
+            RefreshBatchSummary();
+            RaiseCommandState();
+            return;
         }
 
         Results.Clear();
@@ -231,17 +260,27 @@ public sealed partial class IdPhotoViewModel : ObservableObject
         if (SourceImages.Count == 0)
         {
             BatchSummary = string.Empty;
+            SourceImagePath = string.Empty;
             return;
         }
 
         SourceImagePath = SourceImages[0];
         LoadPreview(SourceImages[0]);
+        RefreshBatchSummary();
+        RaiseCommandState();
+    }
+
+    private void RefreshBatchSummary()
+    {
+        if (SourceImages.Count == 0)
+        {
+            BatchSummary = string.Empty;
+            return;
+        }
 
         BatchSummary = SourceImages.Count == 1
             ? Path.GetFileName(SourceImages[0])
             : $"已选 {SourceImages.Count} 张：{Path.GetFileName(SourceImages[0])} 等";
-
-        RaiseCommandState();
     }
 
     /// <summary>清空待处理列表。</summary>
@@ -266,10 +305,7 @@ public sealed partial class IdPhotoViewModel : ObservableObject
             return;
         }
 
-        SourceImages.Clear();
-        SourceImages.Add(path);
-        BatchSummary = Path.GetFileName(path);
-
+        AppendSources(new[] { path });
         SourceImagePath = path;
         Results.Clear();
         SelectedResult = null;
