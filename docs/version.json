@@ -1,14 +1,14 @@
 {
-  "version": "0.44",
-  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe",
-  "size": 82824277,
-  "sha256": "4c384ff62096e3188d94116b488999cdc81f9e1d7e388345a4c6fcf686aa6f6e",
-  "notes": "feat(更新): 更新源内置且不可更改；清单改为镜像优先（省掉每次白等连接超时）",
-  "publishedAt": "2026-11-13",
+  "version": "0.60",
+  "url": "https://github.com/KEY-MAKE/ClassManger/releases/download/v0.60/ClassManager.App.exe",
+  "size": 83152319,
+  "sha256": "e2f567e4d21247f16f6faa9111142accc5bb72d61492c61dc4881094d349d361",
+  "notes": "chore(release): 0.60 发版准备——workflow 去掉 Secret 明文注入，改用仓库内 credentials.enc",
+  "publishedAt": "2026-11-28",
   "mirrors": [
-    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe",
-    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe",
-    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.44/ClassManager.App.exe"
+    "https://ghfast.top/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.60/ClassManager.App.exe",
+    "https://ghproxy.net/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.60/ClassManager.App.exe",
+    "https://githubproxy.cc/https://github.com/KEY-MAKE/ClassManger/releases/download/v0.60/ClassManager.App.exe"
   ],
   "page": "https://github.com/KEY-MAKE/ClassManger/releases/latest"
 }
