@@ -36,6 +36,10 @@ public partial class FloatingBallWindow : Window
     {
         InitializeComponent();
 
+        // 悬浮球是"贴纸"，不该抢焦点：
+        // 不设这两个的话，主窗口刚打开就失去焦点，用户得点一下任务栏才能操作。
+        ShowActivated = false;
+
         Width = CollapsedSize;
         Height = CollapsedSize;
 
@@ -50,13 +54,10 @@ public partial class FloatingBallWindow : Window
             StartTopmostGuard();
         };
 
-        SourceInitialized += (_, _) =>
-        {
-            if (PresentationSource.FromVisual(this) is HwndSource source)
-            {
-                source.AddHook(WndProc);
-            }
-        };
+        // 不再挂 WM_NCHITTEST 做穿透：
+        // 那套「圆外返回 HTTRANSPARENT」的做法在实测里导致整个窗口连左键都收不到
+        // （右键菜单是系统级消息还能弹，所以表现为「右键能用、左键死了」）。
+        // 先保证球能点能拖，挡到东西的问题用「拖走 / 右键隐藏」解决。
 
         Closed += (_, _) =>
         {
@@ -67,11 +68,26 @@ public partial class FloatingBallWindow : Window
 
     // ---------------- 拖动 / 点击 ----------------
 
+    private static void Log(string message)
+    {
+        try
+        {
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cm_ball.log");
+            System.IO.File.AppendAllText(
+                path,
+                $"{DateTime.Now:HH:mm:ss.fff} {message}\n",
+                new System.Text.UTF8Encoding(false));
+        }
+        catch
+        {
+            // 日志失败不影响功能
+        }
+    }
+
     private void OnBallMouseDown(object sender, MouseButtonEventArgs e)
     {
-        // 统一用「屏幕坐标」做基准：e.GetPosition 给的是逻辑像素，
-        // PointToScreen 给的是物理像素，系统开了 125%/150% 缩放时两者不等，
-        // 混着算就会出现「拖一下飞出去」或者「拖不动」。
+        Log($"DOWN  button={e.ChangedButton} pos={e.GetPosition(this)}");
+
         var screen = PointToScreen(e.GetPosition(this));
         _grabOffset = new Point(screen.X - Left, screen.Y - Top);
 
@@ -89,12 +105,12 @@ public partial class FloatingBallWindow : Window
 
         var now = PointToScreen(e.GetPosition(this));
 
-        // 超过 3 像素才算拖动，避免手抖导致点不开罗盘
         if (!_dragging
             && (Math.Abs(now.X - Left - _grabOffset.X) > 3
                 || Math.Abs(now.Y - Top - _grabOffset.Y) > 3))
         {
             _dragging = true;
+            Log("DRAG  start");
         }
 
         if (!_dragging)
@@ -108,6 +124,8 @@ public partial class FloatingBallWindow : Window
 
     private void OnBallMouseUp(object sender, MouseButtonEventArgs e)
     {
+        Log($"UP    button={e.ChangedButton} dragging={_dragging}");
+
         if (IsMouseCaptured)
         {
             ReleaseMouseCapture();
@@ -119,9 +137,14 @@ public partial class FloatingBallWindow : Window
             return;
         }
 
-        // 左键单击（没拖动）→ 展开 / 收起罗盘
+        Log("TOGGLE");
         Toggle();
         e.Handled = true;
+    }
+
+    private void OnBallRightDown(object sender, MouseButtonEventArgs e)
+    {
+        Log("RIGHT down（右键菜单走系统默认）");
     }
 
     // ---------------- 展开 / 收起 ----------------
@@ -150,6 +173,7 @@ public partial class FloatingBallWindow : Window
         Top = centerY - ExpandedSize / 2;
 
         _expanded = true;
+        Log($"EXPAND  w={Width} h={Height} left={Left} top={Top}");
 
         CompassLayer.Visibility = Visibility.Visible;
         CompassLayer.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140))
@@ -169,6 +193,8 @@ public partial class FloatingBallWindow : Window
         Top = centerY - CollapsedSize / 2;
 
         _expanded = false;
+        Log("COLLAPSE");
+
         CompassLayer.Visibility = Visibility.Collapsed;
         CompassLayer.Opacity = 0;
     }
@@ -295,81 +321,6 @@ public partial class FloatingBallWindow : Window
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
         int x, int y, int cx, int cy, uint flags);
-
-    /// <summary>
-    /// 让「不该点的区域」鼠标穿透过去。
-    /// <para>
-    /// 透明窗口的命中测试是按矩形算的：72×72 的收起态、340×340 的展开态，
-    /// 四角那些完全透明的地方照样会吃掉下面的点击 —— 用户会觉得「这块点不动了」。
-    /// 这里按圆形判定，圆外一律返回 HTTRANSPARENT，鼠标事件直接穿到下层窗口。
-    /// </para>
-    /// </summary>
-    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        const int WM_NCHITTEST = 0x0084;
-        const int HTTRANSPARENT = -1;
-
-        if (msg != WM_NCHITTEST)
-        {
-            return IntPtr.Zero;
-        }
-
-        try
-        {
-            // lParam 低 16 位是 x、高 16 位是 y（屏幕坐标，有符号）
-            var raw = lParam.ToInt64();
-            var screenX = (short)(raw & 0xFFFF);
-            var screenY = (short)((raw >> 16) & 0xFFFF);
-
-            // 注意：这里必须用 Width/Height（我们显式设过），
-            // 不能用 ActualWidth/ActualHeight —— 窗口刚创建、还没布局时它们是 0，
-            // 一算就变成「整个窗口都在圆外」，连球自己都被判成穿透，于是点不动也拖不动。
-            var w = Width;
-            var h = Height;
-
-            if (double.IsNaN(w) || double.IsNaN(h) || w <= 1 || h <= 1)
-            {
-                // 尺寸还没准备好 → 不要穿透，宁可挡住也不能让球失去响应
-                return IntPtr.Zero;
-            }
-
-            var local = PointFromScreen(new Point(screenX, screenY));
-
-            // 球本身永远可点（半径给足，含光晕）
-            var ballR = 36.0;
-            var ballDx = local.X - w / 2;
-            var ballDy = local.Y - h / 2;
-
-            if (ballDx * ballDx + ballDy * ballDy <= ballR * ballR)
-            {
-                return IntPtr.Zero;   // 球上 → 正常处理
-            }
-
-            if (!_expanded)
-            {
-                // 收起态：球以外的四角穿透
-                handled = true;
-                return new IntPtr(HTTRANSPARENT);
-            }
-
-            // 展开态：盘面内可点，盘面外穿透
-            var panelR = 152.0;
-            var dx = local.X - w / 2;
-            var dy = local.Y - h / 2;
-
-            if (dx * dx + dy * dy > panelR * panelR)
-            {
-                handled = true;
-                return new IntPtr(HTTRANSPARENT);
-            }
-        }
-        catch
-        {
-            // 算不出来就按默认（可点）处理，宁可挡住也不能让球点不了
-        }
-
-        return IntPtr.Zero;
-    }
 
     /// <summary>右键「隐藏悬浮球」：藏起来，用托盘图标可以再叫出来。</summary>
     private void OnHideBallClick(object sender, RoutedEventArgs e)
