@@ -32,6 +32,7 @@ public partial class FloatingBallWindow : Window
     private double _dragStartTop;
     private Point _grabOffset;
     private DispatcherTimer? _nameTimer;
+    private RollCallResultPopup? _resultPopup;
     private DispatcherTimer? _topmostGuard;
 
     public FloatingBallWindow()
@@ -201,7 +202,7 @@ public partial class FloatingBallWindow : Window
         }
         catch (Exception ex)
         {
-            ShowName("出错：" + ex.Message);
+            ShowResultPopup("出错", ex.Message);
             Collapse();
             return;
         }
@@ -209,7 +210,10 @@ public partial class FloatingBallWindow : Window
         if (result is null)
         {
             // 「只点未到」模式下全点完了
-            ShowName(AppServices.RollCall.IsAllCalled ? "都点过了" : "没有名单");
+            ShowResultPopup(
+                AppServices.RollCall.IsAllCalled ? "都点过了" : "没有名单",
+                AppServices.RollCall.IsAllCalled ? null : "请先在主界面导入名单");
+
             Collapse();
             return;
         }
@@ -217,14 +221,10 @@ public partial class FloatingBallWindow : Window
         // 通知点名页刷新「已点」标记
         AppServices.NotifyRollCallChanged();
 
-        var name = result.Student.Name;
+        ShowResultPopup(
+            result.Student.Name,
+            result.AlreadyCalled ? "本轮已点过（重复）" : null);
 
-        if (result.AlreadyCalled)
-        {
-            name += "\n(重复)";
-        }
-
-        ShowName(name);
         Collapse();
     }
 
@@ -235,11 +235,11 @@ public partial class FloatingBallWindow : Window
         {
             AppServices.RollCall.Reset();
             AppServices.NotifyRollCallChanged();
-            ShowName("已复位");
+            ShowResultPopup("已复位", "点名记录已清空，名单还在");
         }
         catch
         {
-            ShowName("复位失败");
+            ShowResultPopup("复位失败", null);
         }
 
         Collapse();
@@ -273,31 +273,42 @@ public partial class FloatingBallWindow : Window
 
     // ---------------- 名字显示 ----------------
 
-    private void ShowName(string name)
+    /// <summary>
+    /// 弹结果浮窗（大字，独立窗口浮在 PPT 上）。
+    /// <para>球本身保持图标不动 —— 72px 里塞名字投影出来根本看不清。</para>
+    /// </summary>
+    private void ShowResultPopup(string name, string? hint)
     {
-        BallIcon.Visibility = Visibility.Collapsed;
-        BallName.Text = name;
-
-        // 名字长了就缩字号，尽量塞进球里
-        BallName.FontSize = name.Length switch
+        try
         {
-            <= 2 => 17,
-            3 => 15,
-            4 => 12.5,
-            _ => 10.5,
-        };
-
-        BallName.Visibility = Visibility.Visible;
-
-        _nameTimer?.Stop();
-        _nameTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
-        _nameTimer.Tick += (_, _) =>
+            _resultPopup?.Close();
+            _resultPopup = new RollCallResultPopup(name, hint);
+            _resultPopup.Show();
+        }
+        catch
         {
-            _nameTimer?.Stop();
-            BallName.Visibility = Visibility.Collapsed;
-            BallIcon.Visibility = Visibility.Visible;
-        };
-        _nameTimer.Start();
+            // 浮窗起不来就让球闪一下，至少有个反馈
+            try
+            {
+                BallIcon.Visibility = Visibility.Collapsed;
+                BallName.Text = name;
+                BallName.Visibility = Visibility.Visible;
+
+                _nameTimer?.Stop();
+                _nameTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                _nameTimer.Tick += (_, _) =>
+                {
+                    _nameTimer?.Stop();
+                    BallName.Visibility = Visibility.Collapsed;
+                    BallIcon.Visibility = Visibility.Visible;
+                };
+                _nameTimer.Start();
+            }
+            catch
+            {
+                // 忽略
+            }
+        }
     }
 
     // ---------------- 置顶加固 ----------------
