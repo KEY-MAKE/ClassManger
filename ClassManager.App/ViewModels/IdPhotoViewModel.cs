@@ -438,6 +438,13 @@ public sealed partial class IdPhotoViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 精细抠图（RMBG 2.0）。默认开 —— 头发边缘明显更干净，
+    /// 代价是首次要下 977MB 模型。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isFineMatting = true;
+
     private IdPhotoSpec BuildSpec()
     {
         var backgrounds = new List<IdPhotoBackground>();
@@ -459,7 +466,13 @@ public sealed partial class IdPhotoViewModel : ObservableObject
 
         var spec = IsTwoInch ? IdPhotoSpec.TwoInch : IdPhotoSpec.OneInch;
 
-        return spec with { Backgrounds = backgrounds };
+        return spec with
+        {
+            Backgrounds = backgrounds,
+            // 完整保留用户上传的构图，只换底、不裁切
+            KeepWholePerson = true,
+            Matting = IsFineMatting ? IdPhotoMatting.Fine : IdPhotoMatting.Standard,
+        };
     }
 
     [RelayCommand]

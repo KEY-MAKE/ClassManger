@@ -80,6 +80,26 @@
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,8,0,0" />
+
+                        <Separator Margin="0,12,0,8" />
+
+                        <TextBlock Text="抠图精度" Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="0,0,0,6" />
+
+                        <RadioButton GroupName="IdPhotoMatting"
+                                     Content="精细（发丝级，首次下 977MB）"
+                                     IsChecked="{Binding IsFineMatting}" />
+                        <RadioButton GroupName="IdPhotoMatting"
+                                     Content="标准（快，头发边缘一般）"
+                                     Margin="0,6,0,0"
+                                     IsChecked="{Binding IsFineMatting, Converter={StaticResource InverseBooleanConverter}}" />
+
+                        <TextBlock Text="人像按原图构图完整保留，不裁切。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,10,0,0" />
                     </StackPanel>
                 </Border>
 

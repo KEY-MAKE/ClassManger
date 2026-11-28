@@ -17,6 +17,23 @@ public enum IdPhotoBackground
 }
 
 /// <summary>
+/// 抠图精度档位。
+/// <para>
+/// U2Net 对发丝这类细边界只有约 70% 准确度，头发边缘会发糊；
+/// BRIA RMBG 2.0（BiRefNet 架构）能到 90% 以上，但模型 977MB，下载要等。
+/// 所以给两档：快 vs 细。
+/// </para>
+/// </summary>
+public enum IdPhotoMatting
+{
+    /// <summary>标准：U2Net，168MB，速度快，头发一般。</summary>
+    Standard,
+
+    /// <summary>精细：RMBG 2.0，977MB，发丝级边缘（首次需下载）。</summary>
+    Fine,
+}
+
+/// <summary>
 /// 证件照规格（300 DPI 下的像素尺寸）。
 /// <para>一寸 25×35 mm → 295×413 px；二寸 35×49 mm → 413×579 px。</para>
 /// </summary>
@@ -30,6 +47,18 @@ public sealed record IdPhotoSpec
 
     /// <summary>输出高度（像素，300 DPI）。</summary>
     public int Height { get; init; } = 413;
+
+    /// <summary>
+    /// 完整保留人像，不裁切。
+    /// <para>
+    /// 默认 true：用户上传什么构图就输出什么构图，只把背景换成纯色。
+    /// 设 false 才走「按人脸比例裁切」的老逻辑。
+    /// </para>
+    /// </summary>
+    public bool KeepWholePerson { get; init; } = true;
+
+    /// <summary>抠图精度（默认精细，头发边缘更干净）。</summary>
+    public IdPhotoMatting Matting { get; init; } = IdPhotoMatting.Fine;
 
     /// <summary>要生成的底色（可多选，一次出多张）。</summary>
     public IReadOnlyList<IdPhotoBackground> Backgrounds { get; init; } =

@@ -53,6 +53,29 @@ public sealed class IdPhotoService : IIdPhotoService
         "https://gh-proxy.com/https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
     };
 
+    /// <summary>RMBG 2.0 模型（精细档）落盘位置，rembg 同样读 ~/.u2net。</summary>
+    private static string FineModelPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".u2net",
+        "bria-rmbg-2.0.onnx");
+
+    /// <summary>RMBG 2.0 约 977MB，低于这个值视为没下完。</summary>
+    private const long FineModelMinBytes = 900L * 1024 * 1024;
+
+    /// <summary>
+    /// 精细模型下载地址。
+    /// <para>
+    /// GitHub 直连对这个 977MB 的包只有 11KB/s（要下二十多小时），
+    /// 所以加速前缀放最前面；实测 gh-proxy / ghproxy.net 都能正常返回。
+    /// </para>
+    /// </summary>
+    private static readonly string[] FineModelUrls =
+    {
+        "https://gh-proxy.com/https://github.com/danielgatis/rembg/releases/download/v0.0.0/bria-rmbg-2.0.onnx",
+        "https://ghproxy.net/https://github.com/danielgatis/rembg/releases/download/v0.0.0/bria-rmbg-2.0.onnx",
+        "https://github.com/danielgatis/rembg/releases/download/v0.0.0/bria-rmbg-2.0.onnx",
+    };
+
     /// <summary>需要的 Python 模块（import 名）。</summary>
     private static readonly string[] RequiredModules = { "rembg", "PIL", "cv2" };
 
@@ -232,6 +255,13 @@ public sealed class IdPhotoService : IIdPhotoService
             return Fail("找不到 Python 解释器。");
         }
 
+        // 精细档要额外的 977MB 模型；没有就在这里下（走加速通道），
+        // 下不动也不放弃 —— 后面 rembg 会自己再试一次。
+        if (spec.Matting == IdPhotoMatting.Fine)
+        {
+            await PrefetchFineModelAsync(progress, ct).ConfigureAwait(false);
+        }
+
         progress?.Report("正在抠图并换底色（CPU 上约几秒到十几秒）…");
 
         var script = BuildGenerateScript(srcImage, outDir, spec);
@@ -361,6 +391,8 @@ public sealed class IdPhotoService : IIdPhotoService
             target_w = {{spec.Width}}
             target_h = {{spec.Height}}
             spec_name = {{ToPyLiteral(spec.Name)}}
+            keep_whole = {{(spec.KeepWholePerson ? "True" : "False")}}
+            model_name = {{ToPyLiteral(spec.Matting == IdPhotoMatting.Fine ? "bria-rmbg" : "u2net")}}
             backgrounds = [{{backgrounds}}]
 
             os.makedirs(out_dir, exist_ok=True)
@@ -371,7 +403,8 @@ public sealed class IdPhotoService : IIdPhotoService
             emit('STEP|正在抠出人像…')
 
             from rembg import remove, new_session
-            session = new_session('u2net')
+            emit('STEP|正在加载抠图模型（' + model_name + '）…')
+            session = new_session(model_name)
             cut = remove(raw, session=session)
             fg = Image.open(io.BytesIO(cut)).convert('RGBA')
 
@@ -383,48 +416,65 @@ public sealed class IdPhotoService : IIdPhotoService
             fg = fg.crop(bbox)
             fg_w, fg_h = fg.size
 
-            emit('STEP|正在按证件照规范构图…')
-
-            face = None
-            try:
-                import cv2
-                import numpy as np
-                bgr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-                if bgr is not None:
-                    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-                    cascade = cv2.CascadeClassifier(
-                        cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-                    rects = cascade.detectMultiScale(gray, 1.1, 5, minSize=(48, 48))
-                    if len(rects) > 0:
-                        r = max(rects, key=lambda x: int(x[2]) * int(x[3]))
-                        face = (int(r[0]) - bbox[0], int(r[1]) - bbox[1], int(r[2]), int(r[3]))
-            except Exception as exc:
-                emit('WARN|人脸检测不可用，改用人像居中：' + str(exc))
-
-            if face is not None and face[2] > 20 and face[3] > 20:
-                # 人脸高度占画面 60%（规范 55%~65%），头顶留 8% 空白
-                scale = (0.60 * target_h) / face[3]
-                scale = max(scale, target_w / fg_w, target_h / fg_h)
-                new_w = max(1, int(round(fg_w * scale)))
-                new_h = max(1, int(round(fg_h * scale)))
-                person = fg.resize((new_w, new_h), Image.LANCZOS)
-                face_cx = (face[0] + face[2] / 2.0) * scale
-                head_top = (face[1] - 0.35 * face[3]) * scale
-                off_x = target_w / 2.0 - face_cx
-                off_y = 0.08 * target_h - head_top
-                # 不允许出现空白边：把偏移夹进「铺满画面」的取值范围
-                off_x = min(0.0, max(float(target_w - new_w), off_x))
-                off_y = min(0.0, max(float(target_h - new_h), off_y))
-                emit('FACE|yes')
-            else:
-                # 检测不到人脸：居中放置，不报错
-                scale = max(target_w / fg_w, target_h / fg_h)
+            if keep_whole:
+                # 完整保留原构图：等比缩放到画布内，居中，四边留纯色底。
+                # 不裁切 —— 用户上传什么构图就输出什么构图。
+                emit('STEP|正在按原构图铺底…')
+                scale = min(target_w / fg_w, target_h / fg_h)
                 new_w = max(1, int(round(fg_w * scale)))
                 new_h = max(1, int(round(fg_h * scale)))
                 person = fg.resize((new_w, new_h), Image.LANCZOS)
                 off_x = (target_w - new_w) / 2.0
                 off_y = (target_h - new_h) / 2.0
-                emit('FACE|no')
+                emit('FACE|whole')
+                face_done = True
+            else:
+                face_done = False
+
+            if not face_done:
+                # 老逻辑：按人脸比例裁切（KeepWholePerson=false 时才走）
+                emit('STEP|正在按证件照规范构图…')
+
+                face = None
+                try:
+                    import cv2
+                    import numpy as np
+                    bgr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+                    if bgr is not None:
+                        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+                        cascade = cv2.CascadeClassifier(
+                            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                        rects = cascade.detectMultiScale(gray, 1.1, 5, minSize=(48, 48))
+                        if len(rects) > 0:
+                            r = max(rects, key=lambda x: int(x[2]) * int(x[3]))
+                            face = (int(r[0]) - bbox[0], int(r[1]) - bbox[1], int(r[2]), int(r[3]))
+                except Exception as exc:
+                    emit('WARN|人脸检测不可用，改用人像居中：' + str(exc))
+
+                if face is not None and face[2] > 20 and face[3] > 20:
+                    # 人脸高度占画面 60%（规范 55%~65%），头顶留 8% 空白
+                    scale = (0.60 * target_h) / face[3]
+                    scale = max(scale, target_w / fg_w, target_h / fg_h)
+                    new_w = max(1, int(round(fg_w * scale)))
+                    new_h = max(1, int(round(fg_h * scale)))
+                    person = fg.resize((new_w, new_h), Image.LANCZOS)
+                    face_cx = (face[0] + face[2] / 2.0) * scale
+                    head_top = (face[1] - 0.35 * face[3]) * scale
+                    off_x = target_w / 2.0 - face_cx
+                    off_y = 0.08 * target_h - head_top
+                    # 不允许出现空白边：把偏移夹进「铺满画面」的取值范围
+                    off_x = min(0.0, max(float(target_w - new_w), off_x))
+                    off_y = min(0.0, max(float(target_h - new_h), off_y))
+                    emit('FACE|yes')
+                else:
+                    # 检测不到人脸：居中放置，不报错
+                    scale = max(target_w / fg_w, target_h / fg_h)
+                    new_w = max(1, int(round(fg_w * scale)))
+                    new_h = max(1, int(round(fg_h * scale)))
+                    person = fg.resize((new_w, new_h), Image.LANCZOS)
+                    off_x = (target_w - new_w) / 2.0
+                    off_y = (target_h - new_h) / 2.0
+                    emit('FACE|no')
 
             base = os.path.splitext(os.path.basename(src))[0]
 
@@ -504,6 +554,113 @@ public sealed class IdPhotoService : IIdPhotoService
         IdPhotoBackground.Blue => "(67, 142, 219)",  // #438EDB
         _ => "(255, 255, 255)",                      // #FFFFFF
     };
+
+    /// <summary>
+    /// 预下载 RMBG 2.0（精细档，约 977MB）。
+    /// 失败不阻断 —— rembg 会自己再试，只是会慢很多。
+    /// </summary>
+    private static async Task PrefetchFineModelAsync(IProgress<string>? progress, CancellationToken ct)
+    {
+        try
+        {
+            if (File.Exists(FineModelPath) && new FileInfo(FineModelPath).Length >= FineModelMinBytes)
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(FineModelPath)!);
+
+            var temp = FineModelPath + ".part";
+            var errors = new List<string>();
+
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(120) };
+
+            foreach (var url in FineModelUrls)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                try
+                {
+                    progress?.Report("正在下载精细抠图模型（约 977MB，仅首次，走加速通道）…");
+
+                    using var response = await client
+                        .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
+                        .ConfigureAwait(false);
+
+                    response.EnsureSuccessStatusCode();
+
+                    var total = response.Content.Headers.ContentLength ?? 0;
+
+                    await using (var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
+                    await using (var destination = File.Create(temp))
+                    {
+                        var buffer = new byte[81920];
+                        long read = 0;
+                        var lastReported = -1;
+                        int n;
+
+                        while ((n = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                        {
+                            await destination.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
+                            read += n;
+
+                            if (total > 0)
+                            {
+                                var percent = (int)(read * 100 / total);
+
+                                if (percent != lastReported && percent % 5 == 0)
+                                {
+                                    lastReported = percent;
+                                    progress?.Report($"正在下载精细抠图模型… {percent}%（{read / 1024 / 1024}MB / {total / 1024 / 1024}MB）");
+                                }
+                            }
+                        }
+                    }
+
+                    if (new FileInfo(temp).Length >= FineModelMinBytes)
+                    {
+                        File.Move(temp, FineModelPath, overwrite: true);
+                        progress?.Report("精细抠图模型已就绪。");
+                        return;
+                    }
+
+                    errors.Add(url + " → 文件不完整");
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(url + " → " + ex.Message);
+                }
+                finally
+                {
+                    try
+                    {
+                        if (File.Exists(temp))
+                        {
+                            File.Delete(temp);
+                        }
+                    }
+                    catch
+                    {
+                        // 忽略
+                    }
+                }
+            }
+
+            progress?.Report("精细模型下载失败，将退回标准档：" + string.Join(" | ", errors.Take(2)));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            progress?.Report("精细模型预下载异常（不影响出图，只是慢）：" + ex.Message);
+        }
+    }
 
     /// <summary>预下载 U2Net 模型。失败不阻断 —— 交给 rembg 自己再试一次。</summary>
     private static async Task PrefetchModelAsync(IProgress<string>? progress, CancellationToken ct)
