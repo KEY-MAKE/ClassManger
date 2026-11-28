@@ -117,36 +117,39 @@
               MouseMove="OnBallMouseMove"
               MouseLeftButtonUp="OnBallMouseUp">
 
+            <!-- 左键才是「打开罗盘」；右键只留一个「隐藏」，
+                 免得和罗盘里的功能重复、让人以为要用右键操作 -->
             <Grid.ContextMenu>
                 <ContextMenu>
-                    <MenuItem Header="点名" Click="OnRollCallClick" />
-                    <MenuItem Header="打开主界面" Click="OnOpenMainClick" />
-                    <Separator />
                     <MenuItem Header="隐藏悬浮球（从托盘找回）" Click="OnHideBallClick" />
                 </ContextMenu>
             </Grid.ContextMenu>
 
             <!-- 外发光 -->
-            <Ellipse Width="72" Height="72" Opacity="0.22">
+            <Ellipse Width="72" Height="72" Opacity="0.20">
                 <Ellipse.Fill>
                     <RadialGradientBrush>
-                        <GradientStop Color="#0E3178" Offset="0.62" />
-                        <GradientStop Color="#000E3178" Offset="1" />
+                        <GradientStop Color="#3A3A3A" Offset="0.60" />
+                        <GradientStop Color="#003A3A3A" Offset="1" />
                     </RadialGradientBrush>
                 </Ellipse.Fill>
             </Ellipse>
 
-            <!-- 主体：直接用应用图标（Class.png 是 256×256 的圆徽章，本身就是圆的） -->
+            <!-- 主体：白色圆底 + 应用图标。
+                 Class.png 是 256×256 的环形徽章，直接铺满 60px 会糊成一团红，
+                 垫一层白底把图标缩到 52px，看起来才像个干净的图标按钮。 -->
+            <Ellipse Width="62" Height="62" Fill="#FFFFFF" />
+
             <Image x:Name="BallBody"
-                   Width="60" Height="60"
-                   Source="/Assets/Class.png"
+                   Width="52" Height="52"
+                   Source="pack://application:,,,/Assets/Class.png"
                    RenderOptions.BitmapScalingMode="HighQuality" />
 
             <!-- 内容：图标 / 学生名字 -->
             <Grid Width="60" Height="60">
                 <Image x:Name="BallIcon"
                        Width="26" Height="26"
-                       Source="/Assets/Class.png"
+                       Source="pack://application:,,,/Assets/Class.png"
                        RenderOptions.BitmapScalingMode="HighQuality"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center" />

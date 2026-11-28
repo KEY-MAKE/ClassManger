@@ -69,7 +69,12 @@ public partial class FloatingBallWindow : Window
 
     private void OnBallMouseDown(object sender, MouseButtonEventArgs e)
     {
-        _grabOffset = e.GetPosition(this);
+        // 统一用「屏幕坐标」做基准：e.GetPosition 给的是逻辑像素，
+        // PointToScreen 给的是物理像素，系统开了 125%/150% 缩放时两者不等，
+        // 混着算就会出现「拖一下飞出去」或者「拖不动」。
+        var screen = PointToScreen(e.GetPosition(this));
+        _grabOffset = new Point(screen.X - Left, screen.Y - Top);
+
         _dragging = false;
         CaptureMouse();
         e.Handled = true;
@@ -82,11 +87,12 @@ public partial class FloatingBallWindow : Window
             return;
         }
 
-        // 只有超过 3px 才算拖动，避免手抖导致点不开
-        var current = e.GetPosition(this);
+        var now = PointToScreen(e.GetPosition(this));
 
+        // 超过 3 像素才算拖动，避免手抖导致点不开罗盘
         if (!_dragging
-            && (Math.Abs(current.X - _grabOffset.X) > 3 || Math.Abs(current.Y - _grabOffset.Y) > 3))
+            && (Math.Abs(now.X - Left - _grabOffset.X) > 3
+                || Math.Abs(now.Y - Top - _grabOffset.Y) > 3))
         {
             _dragging = true;
         }
@@ -96,14 +102,16 @@ public partial class FloatingBallWindow : Window
             return;
         }
 
-        var screen = PointToScreen(current);
-        Left = screen.X - _grabOffset.X;
-        Top = screen.Y - _grabOffset.Y;
+        Left = now.X - _grabOffset.X;
+        Top = now.Y - _grabOffset.Y;
     }
 
     private void OnBallMouseUp(object sender, MouseButtonEventArgs e)
     {
-        ReleaseMouseCapture();
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
 
         if (_dragging)
         {
@@ -111,6 +119,7 @@ public partial class FloatingBallWindow : Window
             return;
         }
 
+        // 左键单击（没拖动）→ 展开 / 收起罗盘
         Toggle();
         e.Handled = true;
     }
@@ -312,17 +321,43 @@ public partial class FloatingBallWindow : Window
             var screenX = (short)(raw & 0xFFFF);
             var screenY = (short)((raw >> 16) & 0xFFFF);
 
+            // 注意：这里必须用 Width/Height（我们显式设过），
+            // 不能用 ActualWidth/ActualHeight —— 窗口刚创建、还没布局时它们是 0，
+            // 一算就变成「整个窗口都在圆外」，连球自己都被判成穿透，于是点不动也拖不动。
+            var w = Width;
+            var h = Height;
+
+            if (double.IsNaN(w) || double.IsNaN(h) || w <= 1 || h <= 1)
+            {
+                // 尺寸还没准备好 → 不要穿透，宁可挡住也不能让球失去响应
+                return IntPtr.Zero;
+            }
+
             var local = PointFromScreen(new Point(screenX, screenY));
 
-            var cx = ActualWidth / 2;
-            var cy = ActualHeight / 2;
-            var dx = local.X - cx;
-            var dy = local.Y - cy;
+            // 球本身永远可点（半径给足，含光晕）
+            var ballR = 36.0;
+            var ballDx = local.X - w / 2;
+            var ballDy = local.Y - h / 2;
 
-            // 收起时只有球（半径 31）；展开时盘面（半径 152）
-            var radius = _expanded ? 152.0 : 31.0;
+            if (ballDx * ballDx + ballDy * ballDy <= ballR * ballR)
+            {
+                return IntPtr.Zero;   // 球上 → 正常处理
+            }
 
-            if (dx * dx + dy * dy > radius * radius)
+            if (!_expanded)
+            {
+                // 收起态：球以外的四角穿透
+                handled = true;
+                return new IntPtr(HTTRANSPARENT);
+            }
+
+            // 展开态：盘面内可点，盘面外穿透
+            var panelR = 152.0;
+            var dx = local.X - w / 2;
+            var dy = local.Y - h / 2;
+
+            if (dx * dx + dy * dy > panelR * panelR)
             {
                 handled = true;
                 return new IntPtr(HTTRANSPARENT);
