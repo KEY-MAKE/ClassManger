@@ -98,13 +98,13 @@
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    Margin="0,0,0,6" />
 
-                        <RadioButton GroupName="IdPhotoMatting"
-                                     Content="精细（边缘更干净，首次下 170MB）"
-                                     IsChecked="{Binding IsFineMatting}" />
-                        <RadioButton GroupName="IdPhotoMatting"
-                                     Content="标准（最快，边缘一般）"
-                                     Margin="0,6,0,0"
-                                     IsChecked="{Binding IsFineMatting, Converter={StaticResource InverseBooleanConverter}}" />
+                        <!-- 用 CheckBox 而不是两个 RadioButton：
+                             同一 GroupName 的 RadioButton 双向绑同一个 bool 时，
+                             选中一个会自动取消另一个，两边互相回写形成无限递归，
+                             实测会把布局线程卡死（InitializeComponent 之后 Loaded 永不触发）。 -->
+                        <CheckBox Content="精细抠图（边缘更干净，首次下 170MB）"
+                                  IsChecked="{Binding IsFineMatting}"
+                                  ToolTip="取消勾选则用标准档：最快，但头发边缘一般" />
 
                         <TextBlock Text="人像按原图构图完整保留，不裁切。"
                                    Style="{StaticResource CaptionTextStyle}"
