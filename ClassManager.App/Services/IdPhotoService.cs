@@ -53,14 +53,23 @@ public sealed class IdPhotoService : IIdPhotoService
         "https://gh-proxy.com/https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
     };
 
-    /// <summary>RMBG 2.0 模型（精细档）落盘位置，rembg 同样读 ~/.u2net。</summary>
+    /// <summary>
+    /// 精细档模型落盘位置。
+    /// <para>
+    /// 用 ISNet 而不是 RMBG 2.0 / BiRefNet：后两者虽然头发更准（90%+ vs 81%），
+    /// 但模型 900MB+，在无 GPU 的机器上实测**单张超 10 分钟且会把内存打爆**
+    /// （用户机器上直接把主程序拖崩了）。ISNet 170MB、CPU 上几秒，是能用的上限。
+    /// </para>
+    /// </summary>
     private static string FineModelPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".u2net",
-        "bria-rmbg-2.0.onnx");
+        ".rembg",
+        "models",
+        "isnet-general-use",
+        "isnet-general-use.onnx");
 
-    /// <summary>RMBG 2.0 约 977MB，低于这个值视为没下完。</summary>
-    private const long FineModelMinBytes = 900L * 1024 * 1024;
+    /// <summary>ISNet 约 170MB，低于这个值视为没下完。</summary>
+    private const long FineModelMinBytes = 150L * 1024 * 1024;
 
     /// <summary>
     /// 精细模型下载地址。
@@ -71,9 +80,9 @@ public sealed class IdPhotoService : IIdPhotoService
     /// </summary>
     private static readonly string[] FineModelUrls =
     {
-        "https://gh-proxy.com/https://github.com/danielgatis/rembg/releases/download/v0.0.0/bria-rmbg-2.0.onnx",
-        "https://ghproxy.net/https://github.com/danielgatis/rembg/releases/download/v0.0.0/bria-rmbg-2.0.onnx",
-        "https://github.com/danielgatis/rembg/releases/download/v0.0.0/bria-rmbg-2.0.onnx",
+        "https://gh-proxy.com/https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
+        "https://ghproxy.net/https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
+        "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
     };
 
     /// <summary>需要的 Python 模块（import 名）。</summary>
@@ -267,7 +276,7 @@ public sealed class IdPhotoService : IIdPhotoService
         var script = BuildGenerateScript(srcImage, outDir, spec);
 
         var run = await Task.Run(
-            async () => await RunPythonAsync(python, script, TimeSpan.FromMinutes(30), ct)
+            async () => await RunPythonAsync(python, script, TimeSpan.FromMinutes(5), ct)
                 .ConfigureAwait(false),
             ct).ConfigureAwait(false);
 
@@ -392,7 +401,7 @@ public sealed class IdPhotoService : IIdPhotoService
             target_h = {{spec.Height}}
             spec_name = {{ToPyLiteral(spec.Name)}}
             keep_whole = {{(spec.KeepWholePerson ? "True" : "False")}}
-            model_name = {{ToPyLiteral(spec.Matting == IdPhotoMatting.Fine ? "bria-rmbg" : "u2net")}}
+            model_name = {{ToPyLiteral(spec.Matting == IdPhotoMatting.Fine ? "isnet-general-use" : "u2net")}}
             backgrounds = [{{backgrounds}}]
 
             os.makedirs(out_dir, exist_ok=True)
@@ -408,6 +417,35 @@ public sealed class IdPhotoService : IIdPhotoService
             cut = remove(raw, session=session)
             fg = Image.open(io.BytesIO(cut)).convert('RGBA')
 
+            # 连通域过滤：只保留面积最大的一块（人物主体），
+            # 去掉旁边纯色板子/杂物被误判成前景的碎块。
+            try:
+                import numpy as np
+                import cv2
+                alpha = np.array(fg.getchannel('A'))
+                solid = (alpha > 127).astype('uint8')
+                num, labels, stats, _ = cv2.connectedComponentsWithStats(solid, 8)
+                if num > 2:
+                    areas = stats[1:, cv2.CC_STAT_AREA]
+                    keep_idx = 1 + int(np.argmax(areas))
+                    total = float(areas.sum())
+                    kept = float(areas.max())
+                    # 最大块占比太小时（比如人物被切成几块）就别乱删
+                    if kept / total >= 0.55:
+                        alpha = np.where(labels == keep_idx, alpha, 0).astype('uint8')
+                        fg.putalpha(Image.fromarray(alpha))
+                        emit('STEP|已清理 ' + str(num - 2) + ' 处背景残留')
+            except Exception as exc:
+                emit('WARN|残留清理跳过：' + str(exc))
+
+            # 边缘轻微羽化：把硬边磨掉 1px，减少锯齿（证件照缩小后尤其明显）
+            try:
+                from PIL import ImageFilter
+                a = fg.getchannel('A').filter(ImageFilter.GaussianBlur(0.6))
+                fg.putalpha(a)
+            except Exception:
+                pass
+
             # 裁掉抠图后四周全透明的空白，后续按人像真实包围盒构图
             bbox = fg.getchannel('A').getbbox()
             if bbox is None:
@@ -420,10 +458,21 @@ public sealed class IdPhotoService : IIdPhotoService
                 # 完整保留原构图：等比缩放到画布内，居中，四边留纯色底。
                 # 不裁切 —— 用户上传什么构图就输出什么构图。
                 emit('STEP|正在按原构图铺底…')
-                scale = min(target_w / fg_w, target_h / fg_h)
-                new_w = max(1, int(round(fg_w * scale)))
-                new_h = max(1, int(round(fg_h * scale)))
+                # 高度铺满：证件照主体是人物，上下留纯色条很丑（用户实测反馈）。
+                # 横向不够宽时（原图偏窄）退回按宽度铺满、纵向居中。
+                scale = target_h / float(fg_h)
+                new_w = fg_w * scale
+                new_h = float(target_h)
+
+                if new_w < target_w:
+                    scale = target_w / float(fg_w)
+                    new_w = float(target_w)
+                    new_h = fg_h * scale
+
+                new_w = max(1, int(round(new_w)))
+                new_h = max(1, int(round(new_h)))
                 person = fg.resize((new_w, new_h), Image.LANCZOS)
+                # 居中对齐；铺满时对应方向偏移为 0，不会出现纯色条
                 off_x = (target_w - new_w) / 2.0
                 off_y = (target_h - new_h) / 2.0
                 emit('FACE|whole')
@@ -581,7 +630,7 @@ public sealed class IdPhotoService : IIdPhotoService
 
                 try
                 {
-                    progress?.Report("正在下载精细抠图模型（约 977MB，仅首次，走加速通道）…");
+                    progress?.Report("正在下载精细抠图模型（约 170MB，仅首次，走加速通道）…");
 
                     using var response = await client
                         .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)

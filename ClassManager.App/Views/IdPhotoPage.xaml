@@ -88,10 +88,10 @@
                                    Margin="0,0,0,6" />
 
                         <RadioButton GroupName="IdPhotoMatting"
-                                     Content="精细（发丝级，首次下 977MB）"
+                                     Content="精细（边缘更干净，首次下 170MB）"
                                      IsChecked="{Binding IsFineMatting}" />
                         <RadioButton GroupName="IdPhotoMatting"
-                                     Content="标准（快，头发边缘一般）"
+                                     Content="标准（最快，边缘一般）"
                                      Margin="0,6,0,0"
                                      IsChecked="{Binding IsFineMatting, Converter={StaticResource InverseBooleanConverter}}" />
 
